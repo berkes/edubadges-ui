@@ -84,9 +84,8 @@ export const extensionToJson = (nameValuePairs) => {
 };
 
 export const publicBadgeInformation = (badgeClass, res) => {
-  //The data from the public endpoint is different then from the graphQL query endpoint
+  //The data from the public endpoint is different from the graphQL query endpoint
   badgeClass.alignments = badgeClass.alignment;
-  badgeClass.criteriaUrl = res['criteria']['id'];
   badgeClass.criteriaText = res['criteria']['narrative'];
   if (res['extensions:LanguageExtension']) {
     badgeClass.language = res['extensions:LanguageExtension']['Language'];

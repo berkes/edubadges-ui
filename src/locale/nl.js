@@ -154,6 +154,7 @@ I18n.translations.nl = {
                 status: "Status",
                 show_all: "Toon meer",
                 show_less: "Toon minder",
+                badgeClassTag: "Tags"
             },
         },
         breadcrumb: {
@@ -339,7 +340,7 @@ I18n.translations.nl = {
             create: "nieuw",
             faculty: "Nieuwe issuer groep maken",
             issuer: "Nieuwe issuer maken",
-            badgeclass: "Nieuwe badge class maken",
+            badgeclass: "Nieuwe badge class maken {{name}}",
             save: "Opslaan",
             cancel: "Annuleren",
         },
@@ -607,6 +608,7 @@ I18n.translations.nl = {
             name_english: "Naam in het Engels",
             name_dutch: "Naam in het Nederlands",
             award_allowed_institutions: "Toegestane edubadge instellingen",
+            badge_class_tags: "Badge class tags",
             requestedBadges: "Aangevraagde edubadges"
         },
         faculty: {
@@ -666,8 +668,6 @@ I18n.translations.nl = {
             description: "Beschrijving",
             about: "Over deze edubadge",
             criteria_text: "Aan welke criteria moet je voldoen om in aanmerking te komen voor deze edubadge?",
-            criteria_url: "Of geef een persistente (blijvende) link naar de criteria of meer informatie",
-            criteria_url_value: "Link naar de criteria en meer informatie:",
             expiresAfter: "Verloopt na",
             expiresAfterOption: "Na",
             expiresAfterNever: "Nooit",
@@ -691,7 +691,7 @@ I18n.translations.nl = {
             studyLoad: "Studielast",
             timeInvestment: "Tijd investering",
             ects: {
-                creditPoints: "Studiepunten (ECTS)",
+                creditPoints: "Studiepunten in ECTS",
                 hours: "Uren"
             },
             sbu: "Study Belasting Uren",
@@ -700,7 +700,17 @@ I18n.translations.nl = {
             eqf: "Indicatief EQF niveau",
             educationProgramIdentifier: "ISAT",
             educationProgramIdentifierLong: "Opleidingscodes",
-            notSet: "-",
+            participation: "Manier van samenwerking",
+            assessment: "Assessment type",
+            url: "URL",
+            isStackable: "Stapelbaar naar andere badge classes?",
+            isGradeAchieved: "Cijfer behaald",
+            gradeAchieved: "Cijfer behaald verplicht?",
+            notSet: "",
+            qualityAssuranceName: "Naam",
+            qualityAssuranceUrl: "URL",
+            qualityAssuranceDescription: "Omschrijving",
+            internal_tags: "Interne tags",
             expirationPeriods: {
                 days: "Dagen",
                 weeks: "Weken",
@@ -733,7 +743,9 @@ I18n.translations.nl = {
                     "Raadpleeg <a target='_blank' rel='noreferrer' href='https://zakelijk.duo.nl/portaal/zoeken-en-vinden/resultaten'>het DUO CROHO register</a> of <a target='_blank' rel='noreferrer' href='https://kwalificaties.s-bb.nl/Lijsten/Groep/14'>de SBB CREBO lijsten</a> als je deze code niet weet.",
                 eqf: "Kijk op <a target='_blank' rel='noreferrer' href='https://www.nlqf.nl/daarom-nlqf/nlqf-niveaus'>https://www.nlqf.nl/daarom-nlqf/nlqf-niveaus</a> voor een overzicht",
                 ects: "Alleen hele en halve punten. <br/>Een minimum van 0,5 punt is vereist.",
-                ectsMicroCredentials: "Alleen hele en halve punten. <br/>Een waarde tussen de 3 en 30 punten is vereist."
+                ectsMicroCredentials: "Alleen hele en halve punten. Valide waarde is tussen de 3 en 30 punten.",
+                studyLoad: "Alleen hele uren. Valide waarde is tussen de 84 en 840 uren.",
+                timeInvestment: "Alleen hele uren. Valide waarde is tussen de 84 en 840 uren.",
             },
             publicUrl: "Publieke URL",
             sorting: "Sorteer:",
@@ -979,7 +991,7 @@ I18n.translations.nl = {
     invites: {
         title: "Nodig iemand uit om zich in te schrijven",
         copyPublicUrl: "Als je de link naar de registratiepagina op je intranet of elektronische leeromgeving wilt plaatsen, kunt je de link kopiëren",
-        copyPublicUrlDisabled: "Deze badge class is privé en kan niet worden uitgereikt",
+        copyPublicUrlDisabled: "Deze badge class is een voorlopige versie en kan niet worden uitgereikt",
         copyUrl: "Kopieer URL"
     },
     file: {
@@ -1184,7 +1196,6 @@ I18n.translations.nl = {
             description: "(Verplicht veld) Bijv. Een overzicht van de geschiedenis vanaf de late oudheid tot de vijftiende eeuw.",
             learningOutcome: "Bijv. Je bent in staat antieke bronnen, maar ook moderne teksten, te lezen en interpreteren en hebt zo een overzicht van alle belangrijke ontwikkelingen.",
             criteriaText: "Bijv. online multiple choice tentamen",
-            criteriaUrl: "Bijv. https://universiteitvanharderwijk.nl/geschiedenis/criteria",
             studyLoad: "Bijv. 120",
             timeInvestment: "Bijv. 260",
             status: {
@@ -1198,7 +1209,10 @@ I18n.translations.nl = {
             alignmentFramework: "Bijv. ESCO",
             alignmentDescription: "Bijv. De tak van wetenschap die aan mensen gerelateerde gebeurtenissen uit het verleden bestudeert, analyseert en beschrijft.",
             alignmentUrl: "Bijv. http://data.europa.eu/esco/skill/2b22f3b1-5de4-43f9-b6d1-b20f65871268",
-            alignmentCode: "Bijv. 2b22f3b1-5de4-43f9-b6d1-b20f65871268"
+            alignmentCode: "Bijv. 2b22f3b1-5de4-43f9-b6d1-b20f65871268",
+            qualityAssuranceName: "e.g. iets",
+            qualityAssuranceUrl: "e.g. https://data.europa.com/qa",
+            internalTags: "Selecteer tags..."
         },
         permissions: {
             notes: "Bijv. waarom heb je permissies gegeven?"
@@ -1243,8 +1257,8 @@ I18n.translations.nl = {
         //badgeClassImage: "badgeClassImage",
         badgeClassExpireSettings: "Geef hier aan of en hoelang de edubadge geldig is. Na deze datum zal een edubadge niet meer geldig zijn.",
         badgeClassName: "Vermijdt afkortingen, zorg voor herkenbare naam ook voor externen.",
-        badgeClassDescription: "Deze beschrijving ondersteund opmaak in markdown formaat. " +
-            "Zie <a target=\"_blank\" href=\"https://wiki.surfnet.nl/display/Edubadges/Edubadges+Example+BadgeClass\"> de wiki </a> voor voorbeelden.",
+        //badgeClassDescription: "Deze beschrijving ondersteund opmaak in markdown formaat. " +
+        //  "Zie <a target=\"_blank\" href=\"https://wiki.surfnet.nl/display/Edubadges/Edubadges+Example+BadgeClass\"> de wiki </a> voor voorbeelden.",
         badgeClassLanguageOfInstruction: "De voertaal die gebruikt is bij het behalen van deze edubadge. ",
         badgeClassLearningOutcome: "Beschrijf de leeruitkomsten of de leerresultaten. Vastgelegd in de Onderwijs- en examenregeling.",
         //badgeClassLearningIssuer: "badgeClassLearningIssuer",
@@ -1259,7 +1273,6 @@ I18n.translations.nl = {
         badgeClassDirectAwardingDisabled: "Indien aangevinkt, dan is voor deze badge class het direct awarden uitgeschakeld",
         badgeClassSelfEnrollmentDisabled: "Indien aangevinkt, dan kan deze badge class niet worden aangevraagd door studenten",
         //badgeClassCriteriaRequirements: "badgeClassCriteriaRequirements",
-        //badgeClassCriteriaUrl: "badgeClassCriteriaUrl",
         //badgeClassTypeOfStudyLoad: "badgeClassTypeOfStudyLoad",
         badgeClassStudyLoadNumber: "Studie Belastings Uren (SBU in uren)",
         badgeClassTimeInvestmentNumber: "Hoeveel uren geïnvesteerd moeten worden om deze non-formal edubadge te kunnen verkrijgen.",
@@ -1274,7 +1287,7 @@ I18n.translations.nl = {
         //badgeClassRelatedFrameworkDescription: "badgeClassRelatedFrameworkDescription",
         facultyName: "Vermijdt afkortingen, zorg voor herkenbare naam ook voor externen.",
         facultyOnBehalfOf: "Indien aangevinkt vermeldt de badge class dat edubadges zijn uitgereikt namens deze issuer groep. Kan gebruikt worden bij het uitgeven namens een consortium.",
-        facultyOnBehalfOfUrl: "Wanneer Uitgeven namens naam issuer groep is aangevinkt, wordt deze URL gebruikt als een externe link naar deze issuer groep.",
+        facultyOnBehalfOfUrl: "Gebruik deze URL als een externe link naar deze issuer groep.",
         facultyOnBehalfOfDisplayName: "Wanneer Uitgeven namens naam issuer groep is aangevinkt, wordt deze weergavenaam gebruikt in plaats van de werkelijke naam van de issuer groep.",
         //facultyDescriptionEn: "facultyDescriptionEn",
         //facultyDescriptionNl: "facultyDescriptionNl",
@@ -1293,6 +1306,7 @@ I18n.translations.nl = {
         institutionGradingTable: "Gebruik hier een URL die niet zal veranderen. (Persistent URL).",
         institutionLinkedinOrgIdentifier: "LinkedIn id voor deze organisatie / instelling",
         institutionAwardAllowedInstitutions: "Selecteer andere instellingen waarvan de studenten<br/>ook edubadges kunnen ontvangen.",
+        institutionBadgeClassTags: "Verwijder of voeg een tag toe. De tags kunnen worden gekoppeld aan badge classes",
         badgeclassAwardAllowedInstitutions: "Selecteer andere instellingen waarvan de studenten<br/>ook deze edubadge kunnen ontvangen.",
         enrollmentEvidenceNarrative: "Een persoonlijke toelichting dat kan worden toegevoegd aan deze toegekende edubadge.",
         enrollmentEvidenceURL: "De URL van een webpagina met bewijs van de geleverde prestatie.",
@@ -1309,7 +1323,8 @@ I18n.translations.nl = {
         endorsementDescription: "De omschrijving van de aanbeveling",
         endorsementClaim: "De claim beschrijft waarom en hoe deze badgeclass vergelijkbaar is met de geselecteerde badge",
         endorsementBadgeClass: "De badgeklasse die je wilt aanbevelen.",
-        awardScheduling: "Voer de datum in waarop de e-mails zullen worden verzonden naar de gebruikers aan wie de badge is toegekend."
+        awardScheduling: "Voer de datum in waarop de e-mails zullen worden verzonden naar de gebruikers aan wie de badge is toegekend.",
+        badgeClassIsStackable: "A stackable badge-class can be linked to another badge-class"
     },
     badgeOverview: {
         faculty: "Issuer groep",
@@ -1337,10 +1352,12 @@ I18n.translations.nl = {
             eqf: "EQF niveau {{level}}",
         },
         badgeClassType: {
-            OTHER: "Anders",
             ARCHIVED: "Gearchiveerd",
             ALL: "Alle",
-            MICRO_CREDENTIALS: "Pilot Microcredentials"
+            MICRO_CREDENTIALS: "Pilot Microcredentials",
+            DRAFT: "Draft",
+            REGULAR: "Regulier",
+            EXTRA_CURRICULAR: "Extra-curricular",
         },
         issuer: {
             contact: "Neem contact op met de issuer",
@@ -1721,10 +1738,10 @@ I18n.translations.nl = {
         title: "Management queries",
         institutionAdmins: "Institution admins",
         institutionBadges: "Badge overview",
-        institutionMicroCredentials: "Micro-credentials count",
-        countMicroCredentials: "Micro-credentials assertions per user",
-        microCredentialsBadges: "Micro-credentials badges",
-        institutionBadgeOverview: "Awarded badges overview",
+        institutionMicroCredentials: "Microcredentials count",
+        countMicroCredentials: "Microcredentials assertions per user",
+        microCredentialsBadges: "Microcredentials edubadges",
+        institutionBadgeOverview: "Awarded edubadges overview",
         issuerMembers: "Issuer members",
         clear: "Clear",
         download: "Download",
@@ -1734,4 +1751,103 @@ I18n.translations.nl = {
         select: "Select the query to run...",
         loaded: "{{name}} query loaded in {{time}}ms and ready to copy, download or show....."
     },
+    newBadgeClassForm: {
+        badgeClassType: "Type",
+        modal: {
+            choose: "Kies een badge class type",
+            tipPre: "Tip: Je kan ook een kopie maken van een ",
+            tipAction: "bestaande badge class",
+            tip: "Klik op een bestaande badge class en kies de optie om de badge class te kopieren rechts bovenin het scherm. Ga naar het ",
+            issuerLink: "overzicht van alle badge classes voor de issuer {{name}}",
+            shortCopy: "Hier kan nog wat meer informatie staan, maar dat is voor ieder type badgeclass dezelfde tekst!",
+            create: "Aanmaken",
+            types: {
+                micro_credential: "Microcredential",
+                regular: "Regulier",
+                extra_curricular: "Extracurriculair"
+            },
+            info: {
+                micro_credential: "Een badge class met alle metadata conform de EU aanbevelingen.",
+                regular: "Een badge class voor geaccrediteerd onderwijs met studiepunten (ECTS/SBU).",
+                extra_curricular: "Een badge class voor extracurriculair onderwijs."
+            },
+            notAvailableTypeInfo: {
+                micro_credential: "Je instelling {{name}} is niet geconfigureerd om mircocredential badges uit te geven.",
+                regular: "Je instelling {{name}} heeft geen formele grondslag en daarom kunnen er geen reguliere badges worden uitgegeven.",
+                extra_curricular: "Je instelling {{name}} heeft geen informele grondslag en daarom kunnen er geen extra curriculare badges worden uitgegeven.",
+            }
+        },
+        form: {
+            placeHolder: "Selecteer een optie...",
+            markupExample: "Voeg een MarkDown voorbeeld in",
+            programmeInformation: "Programma informatie",
+            assessmentInformation: "Assessment informatie",
+            qualityAssurance: "Kwaliteitswaarborging",
+            awardSettings: "Award settings",
+            relatedEducationalFramework: "Gerelateerd Onderwijskundig Raamwerk",
+            switchToStudyLoad: "Gebruik studie load (uren) in plaats van ECTS/SBU",
+            switchToECTS: "Gebruik Credit Points (ECTS/SBU) in plaats van uren",
+            participation: {
+                name: "Vorm van participatie",
+                options: {
+                    organized: "Georganiseerde leeractiviteiten",
+                    personalized: "Gepersonaliseerde leeractiviteiten",
+                    practical: "Werk- of praktijkervaring",
+                    voluntary_work: "Vrijwilligerswerk"
+                }
+            },
+            assessment: {
+                name: "Assessment type",
+                options: {
+                    knowledge_test: "Kennistoets",
+                    behavioural_assessment: "Gedragsassessment",
+                    professional_product: "Beroepsproduct",
+                    application_skill: "Toepassing van een vaardigheid",
+                    portfolio_assessment: "Portfolio assessment",
+                    recognition_acquired_competences: "Erkenning van verworven competenties",
+                    personalized_assessment: "Gepersonaliseerde toetsing"
+                },
+                supervision: "Toezicht & identiteit verificatie",
+                supervised: "Was er toezicht bij de assessment?",
+                idVerification: "Was de identiteit van de lerende geverifieerd?",
+                supervisionOptions: {
+                    o1: "Onder toezicht, met identiteit verificatie",
+                    o2: "Onder toezicht, zonder identiteit verificatie",
+                    o3: "Geen toezicht, zonder identiteit verificatie",
+                    o4: "Geen toezicht, met identiteit verificatie"
+                }
+            },
+            directAward: {
+                title: "Direct awards",
+                directAwardAllowed: "Direct awards toestaan?",
+                details: "Direct award details",
+                evidenceURL: "Bewijs (URL) verplicht voor aanvraag?",
+                narrative: "Motivatie verplicht voor aanvraag?"
+            },
+            selfEnrollment: {
+                title: "Self enrollment",
+                selfEnrollmentAllowed: "Self enrollment toestaan?",
+                details: "Self enrollment details",
+                evidenceURL: "Bewijs (URL) verplicht voor aanvraag?",
+                narrative: "Motivatie verplicht voor aanvraag?"
+            },
+            stackable: {
+                notStackable: "Nee, stand alone microcredential",
+                stackable: "Ja, stackable microcredential",
+            }
+
+        },
+        saveAsDraft: "Bewaar concept",
+        draft: "Concept",
+        preview: "Preview badge class",
+        publish: "Publiceer",
+        tagsPlaceholder: "Voeg een nieuwe tag toe, door hier te typen en op <enter> te drukken",
+        requiredMicroCredentialFramework: "Verplicht Kwaliteitskader Microcredentials voor Professionals HBO en WO",
+        link: " - (link)",
+        programme: "Het programma",
+        assessment: "De assessment",
+        badge: "De badge class",
+        errors: "Er ontbreken verplichte velden of de invoer is niet correct. Controleer de invoer."
+    }
+
 };

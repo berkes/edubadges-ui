@@ -7,7 +7,7 @@
     import {createBadgeclass, editBadgeclass} from "../../api";
     import ExpirationSettings from "./ExpirationSettings.svelte";
     import indicator from "../../icons/chevron-down-large.svg";
-    import {isEmpty} from "lodash";
+    import {isEmpty, translateProperties} from "../../util/utils";
     import {
         ects,
         educationProgramIdentifier,
@@ -24,10 +24,18 @@
     import {trash} from '../../icons';
     import {entityType} from "../../util/entityTypes";
     import {toHttpOrHttps} from "../../util/Url";
-    import {CheckBox} from "../index";
-    import {translateProperties} from "../../util/utils";
     import MarkdownField from "../forms/MarkdownField.svelte";
     import {microCredentialsFramework} from "../../util/microcredentials";
+    import {markDownTemplate} from "../../util/markDownTemplate";
+    import MarkDownExample from "./badgeclass/MarkDownExample.svelte";
+    import Switch from "../forms/Switch.svelte";
+    import {badgeClassTypes} from "../../util/badgeClassTypes";
+    import StudyLoad from "../extensions/badges/StudyLoad.svelte";
+    import {constructErrors, isRequired} from "../../util/requiredAttributes";
+    import PreviewBadgeClassModal from "./PreviewBadgeClassModal.svelte";
+    import TimeInvestment from "../extensions/badges/TimeInvestment.svelte";
+    import Spinner from "../Spinner.svelte";
+    import Error from "../forms/Error.svelte";
 
     export let entityId;
     export let badgeclass = {extensions: [], issuer: {}, alignments: [], criteriaText: ""};
@@ -38,26 +46,85 @@
     export let institution = {};
     export let publicInstitutions = [];
     export let action;
+    export let upgradeKeysDisabled = {
+        qualityAssuranceDescription: true,
+        qualityAssuranceName: true,
+        qualityAssuranceUrl: true,
+        assessmentType: true,
+        assessmentSupervised: true,
+        assessmentIdVerified: true,
+        participation: true
+    }
 
     const isCreate = !entityId;
     const isCopy = !entityId && action === "copy";
     const entity = entityType.BADGE_CLASS;
 
     let expireValueSet = false;
-    let loaded = false;
     let processing = false;
     let publicInstitutionsChosen = undefined;
+    let internalTags = undefined;
+    let loading = true;
 
+    // Toggle for MicroCredentials
     let showStudyLoad = false;
-    let showTimeInvestment = false;
     let isInstitutionMBO = false;
-    let showEducationalIdentifiers = false;
-    let showProgrammeIdentifier = false;
-    let showAlignment = false;
     let showAddAlignmentButton = true;
-    let initialToggle = true;
+    let participationOptions = [];
+    let assessmentOptions = [];
+    let stackableOptions = [];
+    let showMicroCredentialFramework = false;
+
+    let errors = {};
+    let extensions = {};
+    let initial = true;
+    let showPreview = false;
+    let previewBadgeCopy = {};
+
+    const languages = [
+        {value: "en_EN", name: I18n.t("language.en_EN")},
+        {value: "nl_NL", name: I18n.t("language.nl_NL")},
+        {value: "de_DE", name: I18n.t("language.de_DE")},
+        {value: "fr_FR", name: I18n.t("language.fr_FR")},
+        {value: "es_ES", name: I18n.t("language.es_ES")},
+    ];
+
+    const eqfItems = [...Array(8).keys()].map(i => {
+        return {name: `EQF ${i + 1}`, value: i + 1}
+    });
+
 
     onMount(() => {
+        isInstitutionMBO = institution.institutionType === "MBO";
+        const studyLoadValue = extensionValue(badgeclass.extensions, studyLoad);
+        const ectsValue = extensionValue(badgeclass.extensions, ects);
+        let eqfValue = extensionValue(badgeclass.extensions, eqf);
+        if (isCreate && !isCopy) {
+            eqfValue = {name: "EQF 5", value: 5};
+        } else if (eqfValue !== null) {
+            eqfValue = eqfItems.find(item => item.value === eqfValue)
+        }
+        let programmeIdentifiers = extensionValue(badgeclass.extensions, educationProgramIdentifier) || (isCreate && !isCopy ? [""] : []);
+        //Draft regular badge classes need a programmeIdentifier
+        if (programmeIdentifiers.length === 0 && badgeclass.badgeClassType === badgeClassTypes.REGULAR) {
+            programmeIdentifiers = [""];
+        }
+        extensions = {
+            [language.name]: extensionValue(badgeclass.extensions, language) || "en_EN",
+            [ects.name]: ectsValue || (isCreate ? (badgeclass.isMicroCredentials ? 5 : 3) : ""),
+            [eqf.name]: eqfValue,
+            [learningOutcome.name]: extensionValue(badgeclass.extensions, learningOutcome) || "",
+            [educationProgramIdentifier.name]: programmeIdentifiers,
+            [studyLoad.name]: studyLoadValue || "",
+        };
+        if (extensions[eqf.name] && typeof extensions[eqf.name] === "number") {
+            extensions[eqf.name] = {name: `EQF ${extensions[eqf.name]}`, value: extensions[eqf.name]}
+        }
+        const timeInvestmentValue = extensionValue(badgeclass.extensions, timeInvestment) || 0;
+        if ((isCreate && !isCopy) || timeInvestmentValue !== 0) {
+            extensions[timeInvestment.name] = timeInvestmentValue;
+        }
+
         if (!badgeclass.alignments) {
             badgeclass.alignments = []
         }
@@ -73,6 +140,9 @@
         if (publicInstitutions.length > 0 && badgeclass.awardAllowedInstitutions.length > 0) {
             publicInstitutionsChosen = publicInstitutions.filter(ins => badgeclass.awardAllowedInstitutions.includes(ins.identifier))
         }
+        if (badgeclass.tags && badgeclass.tags.length > 0) {
+            internalTags = (institution.tags || []).filter(tag => badgeclass.tags.some(t => parseInt(t.id, 10) === parseInt(tag.id, 10)))
+        }
         badgeclass.alignments = badgeclass.alignments.map(alignment => ({
             target_name: alignment.targetName,
             target_url: alignment.targetUrl,
@@ -81,21 +151,101 @@
             target_code: alignment.targetCode,
             existing: true
         }));
+        const participationTranslation = I18n.translations[I18n.locale].newBadgeClassForm.form.participation.options;
+        participationOptions = Object.keys(participationTranslation).map(key => ({
+            value: key,
+            name: participationTranslation[key]
+        }));
+
+        const assessmentTranslation = I18n.translations[I18n.locale].newBadgeClassForm.form.assessment.options;
+        assessmentOptions = Object.keys(assessmentTranslation).map(key => ({
+            value: key,
+            name: assessmentTranslation[key]
+        }));
+
+        const stackableTranslation = I18n.translations[I18n.locale].newBadgeClassForm.form.stackable;
+        stackableOptions = Object.keys(stackableTranslation).map(key => ({
+            value: key,
+            name: stackableTranslation[key]
+        }));
+
+        if (badgeclass.badgeClassType === badgeClassTypes.MICRO_CREDENTIAL) {
+            badgeclass.isMicroCredentials = true;
+            if (isCreate) {
+                badgeclass.alignments = [{
+                    target_name: microCredentialsFramework.name,
+                    target_url: microCredentialsFramework.url,
+                    target_description: microCredentialsFramework.description,
+                    target_framework: microCredentialsFramework.framework,
+                    target_code: microCredentialsFramework.code,
+                }];
+            }
+        } else if (isCreate) {
+            //All type badgeClasses can have educational frameworks
+            badgeclass.alignments = [{
+                target_name: "",
+                target_url: "",
+                target_description: "",
+                target_framework: "",
+                target_code: "",
+            }];
+        }
+        badgeclass.formal = badgeclass.badgeClassType !== badgeClassTypes.EXTRA_CURRICULAR;
+        if (!isCreate) {
+            const stackable = badgeclass.stackable ? "stackable" : "notStackable";
+            badgeclass.stackable = stackableOptions.find(opt => opt.value === stackable);
+            if (badgeclass.badgeClassType === badgeClassTypes.MICRO_CREDENTIAL) {
+                showStudyLoad = isEmpty(extensions[ects.name]);
+            }
+            badgeclass.participation = participationOptions.find(opt => opt.value === badgeclass.participation);
+            badgeclass.assessmentType = assessmentOptions.find(opt => opt.value === badgeclass.assessmentType);
+        } else {
+            badgeclass.stackable = stackableOptions.find(opt => opt.value === "notStackable");
+            if (isInstitutionMBO) {
+                extensions[studyLoad.name] = 84;
+            } else {
+                switch (badgeclass.badgeClassType) {
+                    case badgeClassTypes.MICRO_CREDENTIAL: {
+                        badgeclass.formal = false;
+                        extensions[ects.name] = 5;
+                        break;
+                    }
+                    case badgeClassTypes.REGULAR: {
+                        badgeclass.formal = true;
+                        extensions[ects.name] = 3;
+                        break;
+                    }
+                    case badgeClassTypes.EXTRA_CURRICULAR: {
+                        badgeclass.formal = false;
+                        extensions[timeInvestment.name] = 84;
+                        break;
+                    }
+                }
+            }
+        }
+
+        Object.keys(upgradeKeysDisabled).forEach(key => {
+            const val = badgeclass[key];
+            upgradeKeysDisabled[key] = !mayEdit && !isEmpty(val) && !isCopy;
+        });
+
+        loading = false;
     });
 
-    if (!isEmpty(badgeclass.alignments)) {
-        showAlignment = true;
+    const performValidation = isPrivate => {
+        badgeclass.isPrivate = isPrivate;
+        const allErrors = constructErrors(badgeclass, extensions);
+        //Hack for micro_credentials, that has an option between StudyLoadExtension and ECTSExtension
+        if (badgeclass.badgeClassType === badgeClassTypes.MICRO_CREDENTIAL) {
+            if (showStudyLoad) {
+                delete allErrors[`extensions.${ects.name}`]
+            } else {
+                delete allErrors[`extensions.${studyLoad.name}`]
+            }
+        }
+        return allErrors;
     }
 
-    let errors = {};
-
-    const languages = [
-        {value: "en_EN", name: I18n.t("language.en_EN")},
-        {value: "nl_NL", name: I18n.t("language.nl_NL")},
-        {value: "de_DE", name: I18n.t("language.de_DE")},
-        {value: "fr_FR", name: I18n.t("language.fr_FR")},
-        {value: "es_ES", name: I18n.t("language.es_ES")},
-    ];
     let languageSelection = languages[0];
     if (!isCreate || isCopy) {
         languageSelection = languages.find(x => x.value === extensionValue(badgeclass.extensions, language));
@@ -104,50 +254,21 @@
         languageSelection = languages.find(x => x.value === language);
     }
 
-    const eqfItems = [...Array(8).keys()].map(i => {
-        return {name: `EQF ${i + 1}`, value: i + 1}
-    });
 
-    let extensions = {};
+    const markDownExample = attribute => {
+        badgeclass[attribute] = markDownTemplate;
+    }
 
-    const addStudyLoad = () => {
-        extensions[ects.name] = badgeclass.isMicroCredentials ? 5 : 2.5;
-        showStudyLoad = true;
-        extensions[timeInvestment.name] = 0;
-        showTimeInvestment = false;
-        badgeclass.awardNonValidatedNameAllowed = false;
-        let eqfValue = extensionValue(badgeclass.extensions, eqf);
-        if (isEmpty(eqfValue)) {
-            eqfValue = {name: "EQF 5", value: 5};
+    const switchStudyLoad = val => {
+        showStudyLoad = !val;
+        if (showStudyLoad) {
+            extensions[studyLoad.name] = 84;
+            delete extensions[ects.name];
+
         } else {
-            eqfValue = eqfItems.find(item => item.value === eqfValue)
+            extensions[ects.name] = badgeclass.isMicroCredentials ? 5 : 3;
+            delete extensions[studyLoad.name];
         }
-        extensions[eqf.name] = eqfValue;
-        if (!isInstitutionMBO) {
-            showEducationalIdentifiers = true;
-            if (isEmpty(extensions[educationProgramIdentifier.name])) {
-                extensions[educationProgramIdentifier.name] = [""];
-            }
-        }
-    }
-
-    const removeStudyLoad = () => {
-        showStudyLoad = false;
-        if (initialToggle || badgeclass.isMicroCredentials) {
-            addTimeInvestment();
-            initialToggle = false;
-        }
-    }
-
-    const removeProgrammeIdentifier = () => {
-        showProgrammeIdentifier = false;
-        showEducationalIdentifiers = false;
-        extensions[educationProgramIdentifier.name] = [];
-    }
-
-    const addProgrammeIdentifier = () => {
-        showProgrammeIdentifier = true;
-        extensions[educationProgramIdentifier.name] = [""];
     }
 
     const addEducationProgramIdentifier = () => {
@@ -161,22 +282,7 @@
         extensions[educationProgramIdentifier.name] = existingValue.filter((val, i) => i !== index);
     }
 
-    const addTimeInvestment = () => {
-        showTimeInvestment = true;
-        extensions[timeInvestment.name] = "";
-        showStudyLoad = false;
-    }
-
-    const removeTimeInvestment = () => {
-        extensions[timeInvestment.name] = null;
-        showTimeInvestment = false;
-        if (badgeclass.isMicroCredentials) {
-            addStudyLoad();
-        }
-    }
-
     const addEmptyAlignment = () => {
-        showAlignment = true
         badgeclass.alignments.push({
             target_name: "",
             target_url: "",
@@ -200,194 +306,158 @@
         return mayEdit && alignment.target_name !== microCredentialsFramework.name;
     }
 
-    const removeAllAlignment = () => {
-        badgeclass.alignments = badgeclass.alignments.filter(alignment => alignment.target_name === microCredentialsFramework.name);
-        showAlignment = badgeclass.alignments.length > 0;
-    }
-
     const removeAlignment = (i) => {
         badgeclass.alignments.splice(i, 1)
         if (Object.keys(errors).length > 0) {
             errors.alignments.splice(i, 1)
             errors = errors
         }
-        if (!badgeclass.alignments || badgeclass.alignments.length === 0) {
-            showAlignment = false
-        } else if (badgeclass.alignments.length < 8) {
+        if (badgeclass.alignments.length < 8) {
             showAddAlignmentButton = true
         }
         badgeclass.alignments = badgeclass.alignments
     }
 
-    const changeIsMicroCredentials = val => {
-        badgeclass.isMicroCredentials = val;
-        if (val) {
-            if (!extensions[eqf.name]) {
-                extensions[eqf.name] = {name: "EQF 5", value: 5};
-            }
-            if (!showStudyLoad && !showTimeInvestment && institution.grondslagFormeel !== null) {
-                addStudyLoad();
-            }
-            if (showStudyLoad && institution.grondslagFormeel !== null) {
-                if (extensions[ects.name] > 30) {
-                    extensions[ects.name] = 30;
-                } else if (extensions[ects.name] < 3) {
-                    extensions[ects.name] = 3;
-                }
-            }
-            if (isCreate || isEmpty(extensions[educationProgramIdentifier.name])) {
-                removeProgrammeIdentifier();
-                showEducationalIdentifiers = false;
-            }
-            const newAlignments = badgeclass.alignments || [];
-            badgeclass.alignments = [{
-                target_name: microCredentialsFramework.name,
-                target_url: microCredentialsFramework.url,
-                target_description: microCredentialsFramework.description,
-                target_framework: microCredentialsFramework.framework,
-                target_code: microCredentialsFramework.code,
-            },
-                ...newAlignments];
-            showAlignment = true;
-        } else {
-            badgeclass.alignments = (badgeclass.alignments || [])
-                .filter(alignment => alignment.target_name !== microCredentialsFramework.name);
-            if (showStudyLoad && isEmpty(extensions[educationProgramIdentifier.name])) {
-                extensions[educationProgramIdentifier.name] = [""];
-                showEducationalIdentifiers = true;
-            }
-        }
+    const convertAlignments = () => {
+        return badgeclass.alignments.map(alignment => ({
+            targetName: alignment.target_name,
+            targetUrl: alignment.target_url,
+            targetDescription: alignment.target_description,
+            targetFramework: alignment.target_framework,
+            targetCode: alignment.target_code
+        }));
     }
 
-    $: if (badgeclass.extensions.length > 0 && !loaded) {
-        isInstitutionMBO = institution.institutionType === "MBO";
-        const studyLoadValue = extensionValue(badgeclass.extensions, studyLoad);
-        const ectsValue = extensionValue(badgeclass.extensions, ects);
-        let eqfValue = extensionValue(badgeclass.extensions, eqf);
-        if (isCreate && !isCopy) {
-            eqfValue = {name: "EQF 5", value: 5};
-        } else if (eqfValue !== null) {
-            eqfValue = eqfItems.find(item => item.value === eqfValue)
+    const doShowPreview = () => {
+        previewBadgeCopy = constructBadgeClassForServer(false, false);
+        previewBadgeCopy.alignments = convertAlignments();
+        previewBadgeCopy.educationProgramIdentifier = extensions[educationProgramIdentifier.name];
+        previewBadgeCopy.learningOutcome = extensions[learningOutcome.name];
+        previewBadgeCopy.eqf = extensions[eqf.name];
+        if (previewBadgeCopy.eqf) {
+            previewBadgeCopy.eqf = previewBadgeCopy.eqf.value;
         }
-        extensions = {
-            [language.name]: extensionValue(badgeclass.extensions, language) || "en_EN",
-            [ects.name]: ectsValue || (isCreate ? (badgeclass.isMicroCredentials ? 5 : 2.5) : ""),
-            [eqf.name]: eqfValue,
-            [learningOutcome.name]: extensionValue(badgeclass.extensions, learningOutcome) || "",
-            [educationProgramIdentifier.name]: extensionValue(badgeclass.extensions, educationProgramIdentifier) || (isCreate && !isCopy ? [""] : []),
-            [studyLoad.name]: studyLoadValue || "",
-        };
-        if (extensions[eqf.name] && typeof extensions[eqf.name] === "number") {
-            extensions[eqf.name] = {name: `EQF ${extensions[eqf.name]}`, value: extensions[eqf.name]}
+        previewBadgeCopy.studyLoad = extensions[studyLoad.name];
+        previewBadgeCopy.timeInvestment = extensions[timeInvestment.name];
+        previewBadgeCopy.ects = extensions[ects.name];
+        previewBadgeCopy.language = extensions[language.name];
+        previewBadgeCopy.ignoreExtensions = true;
+        if (previewBadgeCopy.assessmentType) {
+            previewBadgeCopy.assessmentType = previewBadgeCopy.assessmentType.value;
         }
-        if (!isEmpty(extensions[educationProgramIdentifier.name])) {
-            showEducationalIdentifiers = true;
-            showProgrammeIdentifier = true;
-        }
-        if (institution.grondslagFormeel !== null && (ectsValue || extensions[studyLoad.name] || (isCreate && !isCopy))) {
-            showStudyLoad = true;
-            if (!isInstitutionMBO && extensions[educationProgramIdentifier.name].length > 0) {
-                showEducationalIdentifiers = true;
-            }
-        }
-        if (!showStudyLoad) {
-            const timeInvestmentValue = extensionValue(badgeclass.extensions, timeInvestment) || 0;
-            if ((isCreate && !isCopy) || timeInvestmentValue) {
-                extensions[timeInvestment.name] = timeInvestmentValue;
-                showTimeInvestment = true;
-            }
-        }
-        loaded = true;
+        //To enable scrolling in the modal, is removed again in the close
+        document.body.classList.add("modal-open");
+        showPreview = true;
     }
 
-    function onSubmit() {
-        errors = {};
-        processing = true;
+    const constructBadgeClassForServer = (isPrivate, removeUpperCaseAttributes=true) => {
         let newBadgeclass = {
             ...badgeclass,
             criteria_text: badgeclass.criteriaText,
-            is_private: badgeclass.isPrivate,
+            is_private: isPrivate,
             evidence_required: badgeclass.evidenceRequired,
             narrative_required: badgeclass.narrativeRequired,
             narrative_student_required: badgeclass.narrativeStudentRequired,
             evidence_student_required: badgeclass.evidenceStudentRequired,
             award_non_validated_name_allowed: badgeclass.awardNonValidatedNameAllowed,
             is_micro_credentials: badgeclass.isMicroCredentials,
+            badge_class_type: badgeclass.badgeClassType,
+            participation: badgeclass.participation ? badgeclass.participation.value : null,
+            assessment_type: badgeclass.assessmentType ? badgeclass.assessmentType.value : null,
+            assessment_supervised: badgeclass.assessmentSupervised,
+            assessment_id_verified: badgeclass.assessmentIdVerified,
+            quality_assurance_name: badgeclass.qualityAssuranceName,
+            quality_assurance_url: badgeclass.qualityAssuranceUrl,
+            quality_assurance_description: badgeclass.qualityAssuranceDescription,
+            grade_achieved_required: badgeclass.gradeAchievedRequired,
+            stackable: badgeclass.stackable.value === "stackable",
             direct_awarding_disabled: badgeclass.directAwardingDisabled,
-            self_enrollment_disabled: badgeclass.selfEnrollmentDisabled,
-            criteria_url: toHttpOrHttps(badgeclass.criteriaUrl),
+            self_enrollment_disabled: badgeclass.selfEnrollmentDisabled
         };
         setExpirationPeriod(newBadgeclass);
-        if (!showAlignment) {
-            newBadgeclass.alignments = [];
-        }
         if (newBadgeclass.alignments) {
-            for (let alignment of newBadgeclass.alignments) {
+            newBadgeclass.alignments = newBadgeclass.alignments.filter(alignment =>
+                !isEmpty(alignment.target_name) || !isEmpty(alignment.target_url) || !isEmpty(alignment.target_description) ||
+                !isEmpty(alignment.target_framework) || !isEmpty(alignment.target_code))
+            newBadgeclass.alignments.forEach(alignment => {
                 alignment.target_url = toHttpOrHttps(alignment.target_url)
                 delete alignment.existing
-            }
+            });
         }
         newBadgeclass.extensions = extensionToJson([
             {name: language.name, value: languageSelection.value}
         ]);
         const learningOutcomeValue = extensions[learningOutcome.name];
-        if (learningOutcomeValue) {
+        if (!isEmpty(learningOutcomeValue)) {
             const learningOutcomeExt = extensionToJson([
                 {name: learningOutcome.name, value: learningOutcomeValue}
             ]);
             newBadgeclass.extensions = {...newBadgeclass.extensions, ...learningOutcomeExt}
         }
-        if (showEducationalIdentifiers || showProgrammeIdentifier) {
-            const extensionValues = []
-            const programIdentifiers = extensions[educationProgramIdentifier.name] || [];
+        const extensionValues = []
+        const programIdentifiers = (extensions[educationProgramIdentifier.name] || [])
+            .filter(identifier => !isEmpty(identifier));
+        if (programIdentifiers.length > 0) {
             extensionValues.push({
                 name: educationProgramIdentifier.name,
-                value: programIdentifiers.some(identifier => identifier) ?
-                    programIdentifiers.map(identifier => parseInt(identifier, 10)) : "invalid"
-            })
-            const extension = extensions[eqf.name];
-            if (extension) {
-                extensionValues.push({name: eqf.name, value: extension.value})
-            }
+                value: programIdentifiers.map(identifier => parseInt(identifier, 10))
+            });
             const educationalIdentifiers = extensionToJson(extensionValues);
             newBadgeclass.extensions = {...newBadgeclass.extensions, ...educationalIdentifiers};
         }
-        if (showEducationalIdentifiers || showProgrammeIdentifier || badgeclass.isMicroCredentials) {
-            const extensionValues = []
-            const extension = extensions[eqf.name];
-            if (extension) {
-                extensionValues.push({name: eqf.name, value: extension.value})
-            }
+        const extension = extensions[eqf.name];
+        if (!isEmpty(extension)) {
+            extensionValues.push({name: eqf.name, value: extension.value})
             const eqfIdentifiers = extensionToJson(extensionValues);
             newBadgeclass.extensions = {...newBadgeclass.extensions, ...eqfIdentifiers};
         }
-        if (showStudyLoad) {
-            if (isInstitutionMBO) {
+        if (badgeclass.badgeClassType === badgeClassTypes.EXTRA_CURRICULAR) {
+            newBadgeclass.extensions = {
+                ...newBadgeclass.extensions,
+                ...extensionToJson([{
+                    name: timeInvestment.name,
+                    value: parseInt(extensions[timeInvestment.name])
+                }])
+            }
+        } else {
+            if (showStudyLoad || isInstitutionMBO) {
                 newBadgeclass.extensions = {
                     ...newBadgeclass.extensions,
                     ...extensionToJson([{name: studyLoad.name, value: parseInt(extensions[studyLoad.name])}])
-                }
+                };
             } else {
                 newBadgeclass.extensions = {
                     ...newBadgeclass.extensions,
                     ...extensionToJson([{name: ects.name, value: extensions[ects.name]}])
-                }
-            }
-            newBadgeclass.formal = true;
-        } else {
-            newBadgeclass.formal = false;
-            if (showTimeInvestment) {
-                newBadgeclass.extensions = {
-                    ...newBadgeclass.extensions,
-                    ...extensionToJson([{name: timeInvestment.name, value: parseInt(extensions[timeInvestment.name])}])
-                }
+                };
             }
         }
+        if (removeUpperCaseAttributes) {
+        Object.keys(newBadgeclass).filter(key => /[A-Z]/.test(key)).forEach(key => delete newBadgeclass[key]);
+        }
+
+        return newBadgeclass;
+    }
+
+    const saveDraft = () => onSubmit(true);
+
+    const onSubmit = (isPrivate = false) => {
+        errors = {};
+        processing = true;
+        initial = false;
+        const allErrors = performValidation(isPrivate);
+        errors = allErrors;
+        if (Object.keys(allErrors).length > 0) {
+            processing = false;
+            return;
+        }
+
+        const newBadgeclass = constructBadgeClassForServer(isPrivate);
         if (badgeclass.issuer) {
             newBadgeclass.issuer = badgeclass.issuer.entityId;
         }
         newBadgeclass.award_allowed_institutions = (!newBadgeclass.formal && publicInstitutionsChosen) ? publicInstitutionsChosen.map(ins => ins.id) : [];
-
+        newBadgeclass.tags = internalTags ? internalTags.map(tag => parseInt(tag.id, 10)) : [];
         const args = isCreate ? [newBadgeclass] : [entityId, newBadgeclass];
         const apiCall = isCreate ? createBadgeclass : editBadgeclass;
         apiCall(...args)
@@ -421,395 +491,434 @@
 </script>
 
 <style lang="scss">
-  div.form {
-    display: grid;
-    grid-template-columns: 50% 50%;
-    grid-row: auto;
-    grid-column-gap: 40px;
-    grid-row-gap: 16px;
-    padding-right: 40px;
-
-  }
-
-  @media (max-width: 820px) {
     div.form {
-      grid-template-columns: 100%;
-    }
-  }
+        display: grid;
+        grid-template-columns: 50% 50%;
+        grid-row: auto;
+        grid-column-gap: 40px;
+        grid-row-gap: 22px;
+        padding-right: 40px;
+        max-width: 1020px;
 
-  h4 {
-    color: var(--purple);
-    padding: var(--ver-padding-s) var(--ver-padding-m);
-    font-size: 20px;
-    border-left: 3px solid var(--purple-2);
-    margin: var(--ver-padding-l) 0;
-  }
+        :global(.select-field) {
+            max-width: 100%;
+        }
 
-  span.info {
-    display: inline-block;
-    margin: 6px 0;
-    font-size: 14px;
-
-    &.not-last {
-      margin-bottom: 8px;
-    }
-  }
-
-  div.mark-down-container.disabled {
-    background-color: var(--grey-2);
-    border: 1px solid var(--text-grey-dark);
-    padding: 5px;
-    border-radius: 4px;
-  }
-
-  .issuers {
-    grid-column: span 2;
-  }
-
-  .award-options {
-    margin: 35px 0 10px 0;
-  }
-
-  .deletable-title {
-    display: inline-block;
-  }
-
-  .add-buttons {
-    margin-bottom: 30px;
-  }
-
-  .rm-icon-container {
-    border: none;
-    background-color: inherit;
-    color: purple;
-    display: inline-block;
-    height: 30px;
-    width: 30px;
-    margin: 0 0 5px 0;
-    align-self: center;
-    cursor: pointer;
-  }
-
-  .disabled {
-    cursor: not-allowed !important;
-    color: var(--grey-7);
-  }
-
-  div.input-block {
-    display: flex;
-    position: relative;
-
-    &.not-first {
-      margin-top: 20px;
+        :global(input) {
+            max-width: 100%;
+        }
     }
 
-    button.rm-icon-container {
-      position: absolute;
-      right: 90px;
-      top: 6px;
+    @media (max-width: 820px) {
+        div.form {
+            grid-template-columns: 100%;
+        }
     }
-  }
+
+    .two-columns {
+        grid-column-start: 2;
+        grid-row-start: 2;
+        grid-row-end: 3;
+    }
+
+    .one-row {
+        grid-column: 1 / -1;
+        position: relative;
+    }
+
+    .markup-example {
+        position: absolute;
+        right: 0;
+        top: 10px;
+        font-size: 15px;
+    }
+
+    h4 {
+        color: var(--purple);
+        padding: var(--ver-padding-s) 0;
+        font-size: 26px;
+        font-weight: lighter;
+        border-bottom: 1px solid var(--purple-2);
+        margin: var(--ver-padding-l) 0;
+    }
+
+    a.info {
+        font-size: 14px;
+    }
+
+    span.info {
+        display: inline-block;
+        margin: 6px 0;
+        font-size: 14px;
+
+        &.not-last {
+            margin-bottom: 8px;
+        }
+    }
+
+    div.mark-down-container {
+        &.disabled {
+            background-color: var(--grey-2);
+            border: 1px solid var(--text-grey-dark);
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        &.error {
+            border: 1px solid var(--red-dark);
+            padding: 5px;
+            border-radius: 4px;
+        }
+    }
+
+    .award-options {
+        margin: 35px 0 10px 0;
+    }
+
+    .deletable-title-container {
+        display: flex;
+    }
+
+    .deletable-title {
+        display: inline-block;
+    }
+
+    .add-buttons {
+        margin-bottom: 30px;
+    }
+
+    .rm-icon-container {
+        border: 1px solid var(--grey-3);
+        border-radius: 4px;
+        color: var(--grey-6);
+        background-color: transparent;
+        display: inline-block;
+        padding: 8px 12px;
+        margin: 0 0 5px 0;
+        align-self: center;
+        cursor: pointer;
+
+        &.alignment {
+            position: absolute;
+            right: 0;
+            top: -10px;
+        }
+
+
+        &:hover {
+            color: var(--red-strong-dark);
+        }
+
+        :global(svg) {
+            width: 22px;
+            height: auto;
+        }
+    }
+
+    .disabled {
+        cursor: not-allowed !important;
+        color: var(--grey-7);
+    }
+
+    div.input-block {
+        display: flex;
+        position: relative;
+
+        &.not-first {
+            margin-top: 20px;
+        }
+
+        button.rm-icon-container {
+            position: absolute;
+            right: -58px;
+            top: 0;
+        }
+
+    }
+
+    .line-separator {
+        border: 1px dashed var(--purple-1);
+        grid-column: 1 / -1;
+
+    }
+
+    .required-micro-credential-framework {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        p {
+            font-weight: 800
+        }
+    }
+
+    .warnings {
+        display: flex;
+        width: 100%;
+
+        p {
+            margin-left: auto;
+            color: var(--red-dark);
+        }
+    }
+
 </style>
-
-<EntityForm
-        entityTypeName={entity}
-        parentId={badgeclass.issuer.entityId}
-        {mayDelete}
-        mayEdit={true}
-        {action}
-        {hasUnrevokedAssertions}
-        entityId={entityId}
-        issuer={badgeclass.issuer}
-        faculty={badgeclass.issuer.faculty}
-        badgeclass={isCreate ? null : badgeclass}
-        badgeclassName={isCreate ? null : badgeclass.name}
-        submit={onSubmit}
-        create={isCreate}
-        {processing}>
-
-    <h4>{I18n.t("models.badgeclass.headers.basicInformation")}</h4>
-
-    <div class="form">
-
-        <Field {entity} attribute="image" errors={errors.image} tipKey="badgeClassImage">
-            <File
-                    bind:value={badgeclass.image}
-                    disabled={!mayEdit && !isCopy}
-                    error={errors.image}
-                    removeAllowed={false}/>
-        </Field>
-
-        <ExpirationSettings
-                bind:expireValueSet={badgeclass.expireValueSet}
-                disabled={false}
-                className=""
-                bind:number={badgeclass.expirationDuration}
-                bind:period={badgeclass.expirationPeriod}/>
-
-        <Field {entity} attribute="name" errors={errors.name} tipKey="badgeClassName">
-            <TextInput bind:value={badgeclass.name} disabled={!mayEdit && !isCopy} error={errors.name}
-                       placeholder={I18n.t("placeholders.badgeClass.name")}/>
-        </Field>
-
-        <Field {entity} attribute="language" errors={errors.language} tipKey="badgeClassLanguageOfInstruction">
-            <Select
-                    bind:value={languageSelection}
-                    items={languages}
-                    disabled={!mayEdit && !isCopy}
-                    optionIdentifier="value"
-                    clearable={false}/>
-        </Field>
-
-        <div style="grid-column: span 1;">
-            <Field {entity} attribute="description" errors={errors.description} tipKey="badgeClassDescription">
-                <div class="mark-down-container" class:disabled={!mayEdit && !isCopy}>
-                    <MarkdownField
-                            bind:value={badgeclass.description}
-                            disabled={!mayEdit && !isCopy}
-                    />
-                </div>
-            </Field>
-        </div>
-        <div style="grid-column: span 1;">
-            <Field {entity} attribute="learningOutcome" errors={errors.learningOutcome}
-                   tipKey="badgeClassLearningOutcome">
-                <div class="mark-down-container" class:disabled={!mayEdit && !isCopy}>
-                    <MarkdownField
-                            bind:value={extensions[learningOutcome.name]}
-                            disabled={!mayEdit && !isCopy}
-                    />
-                </div>
-            </Field>
-        </div>
-        <div class="issuers">
-            <Field {entity} attribute="issuer" errors={errors.issuer} tipKey="badgeClassLearningIssuer">
-                <Select
-                        bind:value={badgeclass.issuer}
-                        error={errors.issuer}
-                        disabled={issuers.length === 1 || (!mayEdit && !isCopy)}
-                        clearable={false}
-                        optionIdentifier="entityId"
-                        items={issuers}/>
-            </Field>
-        </div>
-        <div class="badge-class-options">
-            <Field {entity} attribute="badgeClassOptions">
-                <CheckBox
-                        value={badgeclass.isPrivate || false}
-                        inForm={true}
-                        adjustTop={true}
-                        boldLabel={false}
-                        label={I18n.t(['models', entity, 'isPrivate'])}
-                        tipKey="badgeClassIsPrivate"
-                        disabled={hasUnrevokedAssertions}
-                        onChange={val => badgeclass.isPrivate = val}/>
-                <CheckBox
-                        value={badgeclass.awardNonValidatedNameAllowed || false}
-                        inForm={true}
-                        disabled={showStudyLoad}
-                        boldLabel={false}
-                        adjustTop={true}
-                        label={I18n.t(['models', entity, 'awardNonValidatedNameAllowed'])}
-                        tipKey="badgeClassAwardNonValidatedNameAllowed"
-                        onChange={val => badgeclass.awardNonValidatedNameAllowed = val}/>
-                {#if institution.alternativeIdentifier}
-                    <CheckBox
-                            value={badgeclass.isMicroCredentials || false}
-                            inForm={true}
-                            boldLabel={false}
-                            adjustTop={true}
-                            label={I18n.t(['models', entity, 'isMicroCredentials'])}
-                            tipKey="badgeClassIsMicroCredentials"
-                            onChange={changeIsMicroCredentials}/>
-                {/if}
-            </Field>
-            <div class="award-options">
-                <Field {entity} attribute="awardOptions">
-                    {#if institution.directAwardingEnabled}
-                        <CheckBox
-                                value={badgeclass.directAwardingDisabled || false}
-                                inForm={true}
-                                boldLabel={false}
-                                adjustTop={true}
-                                label={I18n.t(['models', entity, 'directAwardingDisabled'])}
-                                tipKey="badgeClassDirectAwardingDisabled"
-                                onChange={val => {
-                                 badgeclass.directAwardingDisabled = val;
-                                 if (val) {
-                                     badgeclass.selfEnrollmentDisabled = false;
-                                 }
-                                }}/>
-                    {/if}
-                    {#if !badgeclass.directAwardingDisabled}
-                        <CheckBox
-                                value={badgeclass.selfEnrollmentDisabled || false}
-                                inForm={true}
-                                boldLabel={false}
-                                adjustTop={true}
-                                label={I18n.t(['models', entity, 'selfEnrollmentDisabled'])}
-                                tipKey="badgeClassSelfEnrollmentDisabled"
-                                onChange={val => badgeclass.selfEnrollmentDisabled = val}/>
-                    {/if}
-                </Field>
-            </div>
-        </div>
-        <Field {entity} attribute="evidenceNarrativeOptions">
-            <CheckBox
-                    value={badgeclass.evidenceRequired || false}
-                    inForm={true}
-                    adjustTop={true}
-                    boldLabel={false}
-                    label={I18n.t(['models', entity, 'evidenceRequired'])}
-                    tipKey="badgeClassEvidenceRequired"
-                    onChange={val => badgeclass.evidenceRequired = val}/>
-            <CheckBox
-                    value={badgeclass.narrativeRequired || false}
-                    inForm={true}
-                    adjustTop={true}
-                    boldLabel={false}
-                    label={I18n.t(['models', entity, 'narrativeRequired'])}
-                    tipKey="badgeClassNarrativeRequired"
-                    onChange={val => badgeclass.narrativeRequired = val}/>
-            <CheckBox
-                    value={badgeclass.narrativeStudentRequired || false}
-                    inForm={true}
-                    adjustTop={true}
-                    boldLabel={false}
-                    label={I18n.t(['models', entity, 'narrativeStudentRequired'])}
-                    tipKey="badgeClassNarrativeStudentRequired"
-                    onChange={val => badgeclass.narrativeStudentRequired = val}/>
-            <CheckBox
-                    value={badgeclass.evidenceStudentRequired || false}
-                    inForm={true}
-                    adjustTop={true}
-                    boldLabel={false}
-                    label={I18n.t(['models', entity, 'evidenceStudentRequired'])}
-                    tipKey="badgeClassEvidenceStudentRequired"
-                    onChange={val => badgeclass.evidenceStudentRequired = val}/>
-        </Field>
-    </div>
-
-    <h4>{I18n.t('models.badgeclass.headers.earningCriteria')}</h4>
-
-    <div class="form">
-        <div style="grid-column: span 1;">
-            <Field {entity} attribute="criteria_text" errors={errors.criteria_text}
-                   tipKey="badgeClassCriteriaRequirements">
-                <div class="mark-down-container" class:disabled={!mayEdit && !isCopy}>
-                    <MarkdownField
-                            bind:value={badgeclass.criteriaText}
-                            disabled={!mayEdit && !isCopy}
-                    />
-                </div>
-            </Field>
-        </div>
-        <Field {entity} attribute="criteria_url" errors={errors.criteria_url} tipKey="badgeClassCriteriaUrl">
-            <TextInput
-                    bind:value={badgeclass.criteriaUrl}
-                    disabled={!mayEdit && !isCopy}
-                    placeholder={I18n.t("placeholders.badgeClass.criteriaUrl")}
-                    error={errors.criteria_url}/>
-        </Field>
-    </div>
-
-    {#if publicInstitutions.length > 0 && !showStudyLoad}
-
-        <h4>{I18n.t('models.badgeclass.headers.allowedInstituions')}</h4>
-
-        <Field {entity} attribute="award_allowed_institutions" errors={errors.award_allowed_institutions}
-               tipKey="badgeclassAwardAllowedInstitutions">
-            <Select
-                    bind:value={publicInstitutionsChosen}
-                    items={publicInstitutions}
-                    isMulti={true}
-                    customIndicator={indicator}
-                    showIndicator={false}
-                    showChevron={true}
-                    clearable={true}
-                    placeholder={I18n.t("placeholders.institution.allowedInstitutions")}
-                    optionIdentifier="id"
-            />
-        </Field>
-    {/if}
-
-    {#if showStudyLoad && (institution.grondslagFormeel !== null || isInstitutionMBO)}
-        <div style="display: flex">
-            <div class="deletable-title"><h4>{I18n.t('models.badgeclass.headers.studyLoad')}</h4></div>
-            {#if institution.grondslagInformeel !== null}
-                {#if mayEdit}
-                    <button class="rm-icon-container" on:click={removeStudyLoad}>{@html trash}</button>
-                {:else}
-                    <button class="rm-icon-container disabled">{@html trash}</button>
-                {/if}
-            {/if}
-        </div>
+{#if loading}
+    <Spinner/>
+{:else}
+    <EntityForm
+            entityTypeName={entity}
+            parentId={badgeclass.issuer.entityId}
+            {mayDelete}
+            mayEdit={true}
+            {action}
+            {hasUnrevokedAssertions}
+            entityId={entityId}
+            issuer={badgeclass.issuer}
+            faculty={badgeclass.issuer.faculty}
+            badgeclass={isCreate ? null : badgeclass}
+            badgeclassName={isCreate ? " - " + I18n.t(`newBadgeClassForm.modal.types.${badgeclass.badgeClassType}`) : badgeclass.name}
+            submit={onSubmit}
+            create={isCreate}
+            cancel={mayEdit ? saveDraft :  window.history.back}
+            cancelText={mayEdit ? I18n.t("newBadgeClassForm.saveAsDraft") : I18n.t("manage.edit.cancel")}
+            submitText={isCreate ? I18n.t("newBadgeClassForm.publish") : I18n.t("manage.edit.save")}
+            previewAction={() => doShowPreview()}
+            {processing}>
 
         <div class="form">
-            {#if isInstitutionMBO}
-                <Field {entity} attribute="hours" errors={errors.StudyLoadExtension} tipKey="badgeClassStudyLoadNumber">
-                    <TextInput
-                            type="number"
-                            bind:value={extensions[studyLoad.name]}
-                            error={errors.StudyLoadExtension}
-                            disabled={!mayEdit && !isCopy}
-                            placeholder={I18n.t("placeholders.badgeClass.studyLoad")}/>
+            <h4 class="one-row">{I18n.t("models.badgeclass.headers.basicInformation")}</h4>
+
+            <div>
+                <Field entity={entity}
+                       attribute="name"
+                       errors={errors.name}
+                       tipKey="badgeClassName"
+                       required={isRequired(badgeclass, "name")}>
+                    <TextInput bind:value={badgeclass.name}
+                               disabled={!mayEdit && !isCopy}
+                               error={errors.name}
+                               onBlur={() => errors}
+                               placeholder={I18n.t("placeholders.badgeClass.name")}/>
                 </Field>
-            {:else if institution.grondslagFormeel !== null}
-                <Field {entity} attribute="ects.creditPoints" errors={errors.ECTSExtension}
-                       tipKey="badgeClassStudyLoadEcts">
+                <Field entity={entity}
+                       attribute="issuer"
+                       errors={errors.issuer}
+                       isSelect={true}
+                       tipKey="badgeClassLearningIssuer">
+                    <Select
+                            bind:value={badgeclass.issuer}
+                            error={errors.issuer}
+                            disabled={issuers.length === 1 || (!mayEdit && !isCopy)}
+                            clearable={false}
+                            optionIdentifier="entityId"
+                            items={issuers}/>
+                </Field>
+            </div>
+            <div class="two-columns">
+                <Field entity={entity}
+                       attribute="image"
+                       errors={errors.image}
+                       tipKey="badgeClassImage"
+                       required={isRequired(badgeclass, "image")}>
+                    <File
+                            bind:value={badgeclass.image}
+                            disabled={!mayEdit && !isCopy}
+                            error={errors.image}
+                            removeAllowed={false}/>
+                </Field>
+            </div>
+
+            <div class="one-row">
+                {#if mayEdit || isCopy}
+                    <MarkDownExample onClick={() => markDownExample("description")} tipKey="badgeClassDescription"/>
+                {/if}
+                <Field entity={entity}
+                       attribute="description"
+                       errors={errors.description}
+                       tipKey="badgeClassDescription"
+                       required={isRequired(badgeclass, "description")}>
+                    <div class="mark-down-container"
+                         class:disabled={!mayEdit && !isCopy}
+                         class:error={errors.description}>
+                        <MarkdownField
+                                bind:value={badgeclass.description}
+                                disabled={!mayEdit && !isCopy}
+                        />
+                    </div>
+                </Field>
+            </div>
+
+            <div class="one-row">
+                {#if mayEdit || isCopy}
+                    <MarkDownExample onClick={() => extensions[learningOutcome.name] = markDownTemplate}
+                                     tipKey="badgeClassLearningOutcome"/>
+                {/if}
+                <Field entity={entity}
+                       attribute="learningOutcome"
+                       errors={errors[`extensions.${learningOutcome.name}`]}
+                       tipKey="badgeClassLearningOutcome"
+                       required={isRequired(badgeclass, `extensions.${learningOutcome.name}`)}>
+                    <div class="mark-down-container"
+                         class:disabled={!mayEdit && !isCopy}
+                         class:error={errors[`extensions.${learningOutcome.name}`]}>
+                        <MarkdownField
+                                bind:value={extensions[learningOutcome.name]}
+                                disabled={!mayEdit && !isCopy}
+                        />
+                    </div>
+                </Field>
+            </div>
+
+            <div class="one-row">
+                {#if mayEdit || isCopy}
+                    <MarkDownExample onClick={() => markDownExample("criteriaText")}
+                                     tipKey="badgeClassCriteriaRequirements"/>
+                {/if}
+                <Field entity={entity}
+                       attribute="criteria_text"
+                       errors={errors.criteriaText}
+                       tipKey="badgeClassCriteriaRequirements"
+                       required={isRequired(badgeclass, "criteriaText")}>
+                    <div class="mark-down-container"
+                         class:disabled={!mayEdit && !isCopy}
+                         class:error={errors.criteriaText}>
+                        <MarkdownField
+                                bind:value={badgeclass.criteriaText}
+                                disabled={!mayEdit && !isCopy}
+                        />
+                    </div>
+                </Field>
+            </div>
+
+            <h4 class="one-row">{I18n.t("newBadgeClassForm.form.programmeInformation")}</h4>
+
+            <Field entity={entity}
+                   attribute="language"
+                   errors={errors.language}
+                   isSelect={true}
+                   tipKey="badgeClassLanguageOfInstruction">
+                <Select
+                        bind:value={languageSelection}
+                        items={languages}
+                        disabled={!mayEdit && !isCopy}
+                        optionIdentifier="value"
+                        clearable={false}/>
+            </Field>
+            {#if isInstitutionMBO}
+                <Field entity={entity}
+                       attribute="hours"
+                       errors={errors[`extensions.${studyLoad.name}`]}
+                       tipKey="badgeClassStudyLoadNumber"
+                       required={isRequired(badgeclass, `extensions.${studyLoad.name}`)}>
+                    <StudyLoad
+                            bind:studyLoad={extensions[studyLoad.name]}
+                            disabled={!mayEdit && !isCopy}
+                    />
+                </Field>
+            {:else if badgeclass.badgeClassType === badgeClassTypes.MICRO_CREDENTIAL}
+                {#if showStudyLoad}
+                    <Field entity={entity}
+                           attribute="hours"
+                           errors={errors[`extensions.${studyLoad.name}`]}
+                           tipKey="badgeClassStudyLoadNumber"
+                           required={isRequired(badgeclass, `extensions.${studyLoad.name}`)}>
+                        <StudyLoad
+                                bind:studyLoad={extensions[studyLoad.name]}
+                                disabled={!mayEdit && !isCopy}
+                        />
+                        <a href="/#"
+                           class="info"
+                           on:click|preventDefault|stopPropagation={() => switchStudyLoad(true)}>
+                            {I18n.t("newBadgeClassForm.form.switchToECTS") }
+                        </a>
+                    </Field>
+                {:else}
+                    <Field entity={entity}
+                           attribute="ects.creditPoints"
+                           errors={errors[`extensions.${ects.name}`]}
+                           tipKey="badgeClassStudyLoadEcts"
+                           required={isRequired(badgeclass, `extensions.${ects.name}`)}>
+                        <EctsCreditPoints
+                                isMicroCredentials={true}
+                                bind:ectsValue={extensions[ects.name]}
+                                disabled={!mayEdit && !isCopy}
+                        />
+                        <a href="/#"
+                           class="info"
+                           on:click|preventDefault|stopPropagation={() => switchStudyLoad(false)}>
+                            {I18n.t("newBadgeClassForm.form.switchToStudyLoad") }
+                        </a>
+                    </Field>
+                {/if}
+            {:else if badgeclass.badgeClassType === badgeClassTypes.REGULAR}
+                <Field entity={entity}
+                       attribute="ects.creditPoints"
+                       errors={errors[`extensions.${ects.name}`]}
+                       tipKey="badgeClassStudyLoadEcts"
+                       required={isRequired(badgeclass, `extensions.${ects.name}`)}>
                     <EctsCreditPoints
-                            isMicroCredentials={badgeclass.isMicroCredentials}
+                            isMicroCredentials={false}
                             bind:ectsValue={extensions[ects.name]}
                             disabled={!mayEdit && !isCopy}
                     />
                 </Field>
-            {/if}
-        </div>
-    {/if}
-
-    {#if showTimeInvestment}
-        <div style="display: flex">
-            <div class="deletable-title"><h4>{I18n.t('models.badgeclass.headers.timeInvestment')}</h4></div>
-            {#if mayEdit}
-                <button class="rm-icon-container" on:click={removeTimeInvestment}>{@html trash}</button>
             {:else}
-                <button class="rm-icon-container disabled">{@html trash}</button>
-            {/if}
-        </div>
+                <Field entity={entity}
+                       attribute="hours"
+                       errors={errors[`extensions.${timeInvestment.name}`]}
+                       tipKey="badgeClassTimeInvestmentNumber"
+                       required={isRequired(badgeclass, `extensions.${timeInvestment.name}`)}>
+                    <TimeInvestment
+                            bind:timeInvestment={extensions[timeInvestment.name]}
+                            disabled={!mayEdit && !isCopy}
+                    />
+                </Field>
 
-        <div class="form">
-            <Field {entity} attribute="hours" errors={errors.TimeInvestmentExtension}
-                   tipKey="badgeClassTimeInvestmentNumber">
-                <TextInput
-                        type="number"
-                        bind:value={extensions[timeInvestment.name]}
-                        error={errors.TimeInvestmentExtension}
+            {/if}
+
+            <Field entity={entity}
+                   attribute="eqf"
+                   errors={errors[`extensions.${eqf.name}`]}
+                   isSelect={true}
+                   tipKey="badgeClassNLQFLevel"
+                   required={isRequired(badgeclass, `extensions.${eqf.name}`)}>
+                <Select
+                        bind:value={extensions[eqf.name]}
+                        items={eqfItems}
                         disabled={!mayEdit && !isCopy}
-                        placeholder={I18n.t("placeholders.badgeClass.timeInvestment")}/>
+                        optionIdentifier="value"
+                        showIndicator={false}
+                        customIndicator={indicator}
+                        showChevron={false}
+                        clearable={!isRequired(badgeclass, `extensions.${eqf.name}`)}/>
+                <span class="info">
+                    {@html I18n.t('models.badgeclass.info.eqf')}
+                </span>
             </Field>
-        </div>
-    {/if}
 
-    {#if showEducationalIdentifiers && !badgeclass.isMicroCredentials}
-        <div style="display: flex">
-            <div class="deletable-title">
-                <h4>{I18n.t('models.badgeclass.headers.educationalIdentifiers')}</h4>
-            </div>
-            {#if mayEdit && (!showStudyLoad || isInstitutionMBO)}
-                <button class="rm-icon-container"
-                        on:click={() => {
-                            showEducationalIdentifiers = false;
-                            showProgrammeIdentifier = false;
-                            extensions[educationProgramIdentifier.name] = [];
-                        }}>{@html trash}</button>
-            {/if}
-        </div>
-        <div class="form">
-            <Field
-                    {entity}
-                    attribute="educationProgramIdentifierLong"
-                    errors={errors.EducationProgramIdentifierExtension}
-                    tipKey="badgeClassProgrammeIdentifier">
+            <Field entity={entity}
+                   attribute="participation"
+                   errors={errors.participation}
+                   isSelect={true}
+                   required={isRequired(badgeclass, "participation")}>
+                <Select
+                        bind:value={badgeclass.participation}
+                        items={participationOptions}
+                        disabled={upgradeKeysDisabled.participation}
+                        optionIdentifier="value"
+                        placeholder={I18n.t("newBadgeClassForm.form.placeHolder")}
+                        showIndicator={false}
+                        customIndicator={indicator}
+                        showChevron={false}
+                        clearable={!isRequired(badgeclass, "participation")}/>
+            </Field>
+
+            <Field entity={entity}
+                   attribute="educationProgramIdentifierLong"
+                   errors={errors[`extensions.${educationProgramIdentifier.name}`]}
+                   tipKey="badgeClassProgrammeIdentifier"
+                   required={isRequired(badgeclass, `extensions.${educationProgramIdentifier.name}`)}>
                 {#each extensions[educationProgramIdentifier.name] as identifier, index}
                     <div class="input-block" class:not-first={index !== 0}>
                         <TextInput
@@ -828,207 +937,317 @@
                 <span class="info not-last">
                     {@html I18n.t('models.badgeclass.info.educationProgramIdentifier')}
                 </span>
-                <AddButton
-                        text={I18n.t('models.badgeclass.addButtons.educationProgramIdentifier')}
-                        handleClick={addEducationProgramIdentifier}
-                        visibility={true}
-                        disabled={!mayEdit}/>
-
-            </Field>
-
-            <Field {entity} attribute="eqf" errors={errors.eqf} tipKey="badgeClassNLQFLevel">
-                <Select
-                        bind:value={extensions[eqf.name]}
-                        items={eqfItems}
-                        disabled={!mayEdit && !isCopy}
-                        optionIdentifier="value"
-                        customIndicator={indicator}
-                        showIndicator={true}
-                        showChevron={true}
-                        clearable={false}/>
-                <span class="info">
-                    {@html I18n.t('models.badgeclass.info.eqf')}
-                </span>
-            </Field>
-        </div>
-    {/if}
-    {#if badgeclass.isMicroCredentials}
-        <h4>{I18n.t('models.badgeclass.headers.qualificationLevel')}</h4>
-        <div class="form">
-            <Field {entity} attribute="eqf" errors={errors.eqf} tipKey="badgeClassNLQFLevel">
-                <Select
-                        bind:value={extensions[eqf.name]}
-                        items={eqfItems}
-                        disabled={!mayEdit && !isCopy}
-                        optionIdentifier="value"
-                        clearable={false}/>
-                <span class="info">
-                    {@html I18n.t('models.badgeclass.info.eqf')}
-                </span>
-            </Field>
-        </div>
-
-        {#if showProgrammeIdentifier}
-            <div style="display: flex">
-                <div class="deletable-title"><h4>{I18n.t('models.badgeclass.headers.educationalIdentifiers')}</h4></div>
-                {#if mayEdit}
-                    <button class="rm-icon-container"
-                            on:click={removeProgrammeIdentifier}>{@html trash}</button>
-                {/if}
-            </div>
-            <div class="form">
-                <Field
-                        {entity}
-                        attribute="educationProgramIdentifierLong"
-                        errors={errors.EducationProgramIdentifierExtension}
-                        tipKey="badgeClassProgrammeIdentifier">
-                    {#each extensions[educationProgramIdentifier.name] as identifier, index}
-                        <div class="input-block" class:not-first={index !== 0}>
-                            <TextInput
-                                    type="text"
-                                    bind:value={extensions[educationProgramIdentifier.name][index]}
-                                    disabled={!mayEdit && !isCopy}
-                                    maxForm={true}
-                                    placeholder={I18n.t("placeholders.badgeClass.educationProgramIdentifier")}
-                                    error={errors.EducationProgramIdentifierExtension}/>
-                            {#if index !== 0}
-                                <button class="rm-icon-container"
-                                        on:click={() => removeEducationProgramIdentifier(index)}>{@html trash}</button>
-                            {/if}
-                        </div>
-                    {/each}
-                    <span class="info not-last">
-                        {@html I18n.t('models.badgeclass.info.educationProgramIdentifier')}
-                    </span>
+                {#if mayEdit || isCopy}
                     <AddButton
                             text={I18n.t('models.badgeclass.addButtons.educationProgramIdentifier')}
                             handleClick={addEducationProgramIdentifier}
                             visibility={true}
-                            disabled={!mayEdit}/>
+                            disabled={!mayEdit && !isCopy}/>
+                {/if}
+            </Field>
+
+            {#if badgeclass.badgeClassType !== badgeClassTypes.EXTRA_CURRICULAR}
+
+                <h4 class="one-row">{I18n.t("newBadgeClassForm.form.assessmentInformation")}</h4>
+
+                <Field entity={entity}
+                       attribute="assessment"
+                       errors={errors.assessmentType}
+                       tipKey="badgeClassAssessmentType"
+                       isSelect={true}
+                       required={isRequired(badgeclass, "assessmentType")}>
+                    <Select
+                            bind:value={badgeclass.assessmentType}
+                            items={assessmentOptions}
+                            disabled={upgradeKeysDisabled.assessmentType}
+                            optionIdentifier="value"
+                            placeholder={I18n.t("newBadgeClassForm.form.placeHolder")}
+                            showIndicator={false}
+                            customIndicator={indicator}
+                            showChevron={false}
+                            clearable={!isRequired(badgeclass, "assessmentType")}/>
                 </Field>
-            </div>
-        {/if}
-    {/if}
-
-    {#if showAlignment}
-        <div style="display: flex">
-            <div class="deletable-title"><h4>{I18n.t('models.badgeclass.headers.alignment')}</h4></div>
-            {#if badgeclass.alignments.every(alignment => mayRemoveAlignment(alignment))}
-                <button class="rm-icon-container" on:click={() => removeAllAlignment()}>{@html trash}</button>
-            {/if}
-        </div>
-
-        {#each badgeclass.alignments as alignment, i}
-            {#if mayRemoveAlignment(alignment) && (mayEdit || !alignment.existing) && badgeclass.alignments.length > 1}
                 <div>
-                    <button style="float:right;" class="rm-icon-container"
-                            on:click={() => removeAlignment(i) }>{@html trash}</button>
+                    <Switch value={badgeclass.assessmentSupervised}
+                            disabled={upgradeKeysDisabled.assessmentType || isEmpty(badgeclass.assessmentType)}
+                            label={I18n.t("newBadgeClassForm.form.assessment.supervision")}
+                            question={I18n.t("newBadgeClassForm.form.assessment.supervised")}
+                            onChange={() => badgeclass.assessmentSupervised = !badgeclass.assessmentSupervised}/>
+                    <Switch value={badgeclass.assessmentIdVerified}
+                            disabled={upgradeKeysDisabled.assessmentType || isEmpty(badgeclass.assessmentType)}
+                            question={I18n.t("newBadgeClassForm.form.assessment.idVerification")}
+                            onChange={() => badgeclass.assessmentIdVerified = !badgeclass.assessmentIdVerified}/>
                 </div>
-            {/if}
-            <div class="form">
-                <Field {entity} attribute="alignmentName"
-                       errors={errors.alignments? errors.alignments[i].target_name: [] }
-                       tipKey="badgeClassRelatedFrameworkName">
-                    <TextInput
-                            bind:value={alignment.target_name}
-                            disabled={!mayRemoveAlignment(alignment) && !isCopy}
-                            error={errors.target_name}
-                            placeholder={I18n.t("placeholders.badgeClass.alignmentName")}
-                    />
+
+                <h4 class="one-row">{I18n.t("newBadgeClassForm.form.qualityAssurance")}</h4>
+
+                <Field entity={entity}
+                       attribute="qualityAssuranceName"
+                       errors={errors.qualityAssuranceName}
+                       tipKey="qualityAssuranceName"
+                       required={isRequired(badgeclass, "qualityAssuranceName")}>
+                    <TextInput bind:value={badgeclass.qualityAssuranceName}
+                               disabled={upgradeKeysDisabled.qualityAssuranceName}
+                               error={errors.qualityAssuranceName}
+                               placeholder={I18n.t("placeholders.badgeClass.qualityAssuranceName")}/>
                 </Field>
-                <Field {entity} attribute="alignmentFramework"
-                       errors={errors.alignments? errors.alignments[i].target_framework: [] }
-                       tipKey="badgeClassRelatedFrameworkFramework">
-                    <TextInput
-                            bind:value={alignment.target_framework}
-                            disabled={!mayRemoveAlignment(alignment) && !isCopy}
-                            error={errors.target_framework}
-                            placeholder={I18n.t("placeholders.badgeClass.alignmentFramework")}
-                    />
+
+                <Field entity={entity}
+                       attribute="qualityAssuranceUrl"
+                       errors={errors.qualityAssuranceUrl || errors.quality_assurance_url}
+                       tipKey="qualityAssuranceUrl"
+                       required={isRequired(badgeclass, "qualityAssuranceUrl")}>
+                    <TextInput bind:value={badgeclass.qualityAssuranceUrl}
+                               disabled={upgradeKeysDisabled.qualityAssuranceUrl}
+                               error={errors.qualityAssuranceUrl || errors.quality_assurance_url}
+                               placeholder={I18n.t("placeholders.badgeClass.qualityAssuranceUrl")}/>
                 </Field>
-                <Field {entity} attribute="alignmentUrl" errors={errors.alignments? errors.alignments[i].target_url: []}
-                       tipKey="badgeClassRelatedFrameworkURL">
-                    <TextInput
-                            bind:value={alignment.target_url}
-                            disabled={!mayRemoveAlignment(alignment) && !isCopy}
-                            error={errors.target_url}
-                            placeholder={alignment.target_name !== microCredentialsFramework.name ? I18n.t("placeholders.badgeClass.alignmentUrl") : ""}
-                    />
-                </Field>
-                <Field {entity} attribute="alignmentCode"
-                       errors={errors.alignments? errors.alignments[i].target_code: []}
-                       tipKey="badgeClassRelatedFrameworkCode">
-                    <TextInput
-                            bind:value={alignment.target_code}
-                            disabled={!mayRemoveAlignment(alignment) && !isCopy}
-                            error={errors.target_code}
-                            placeholder={I18n.t("placeholders.badgeClass.alignmentCode")}
-                    />
-                </Field>
-                <div style="grid-column: span 1;">
-                    <Field {entity} attribute="alignmentDescription"
-                           errors={errors.alignments? errors.alignments[i].target_description: []}
-                           tipKey="badgeClassRelatedFrameworkDescription">
-                        <div class="mark-down-container" class:disabled={(!mayEdit && alignment.existing) && !isCopy}>
+
+                <div class="one-row">
+                    {#if !upgradeKeysDisabled.qualityAssuranceDescription}
+                        <MarkDownExample onClick={() => markDownExample("qualityAssuranceDescription")}
+                                         tipKey="qualityAssuranceDescription"/>
+                    {/if}
+                    <Field entity={entity}
+                           attribute="qualityAssuranceDescription"
+                           errors={errors.qualityAssuranceDescription}
+                           tipKey="qualityAssuranceDescription"
+                           required={isRequired(badgeclass, "qualityAssuranceDescription")}>
+                        <div class="mark-down-container"
+                             class:disabled={upgradeKeysDisabled.qualityAssuranceDescription}
+                             class:error={errors.qualityAssuranceDescription}>
                             <MarkdownField
-                                    bind:value={alignment.target_description}
-                                    disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                    bind:value={badgeclass.qualityAssuranceDescription}
+                                    disabled={upgradeKeysDisabled.qualityAssuranceDescription}
                             />
                         </div>
                     </Field>
                 </div>
+
+            {/if}
+
+            <h4 class="one-row">{I18n.t("newBadgeClassForm.form.awardSettings")}</h4>
+            <Switch value={!badgeclass.directAwardingDisabled}
+                    label={I18n.t("newBadgeClassForm.form.directAward.title")}
+                    question={I18n.t("newBadgeClassForm.form.directAward.directAwardAllowed")}
+                    onChange={() => badgeclass.directAwardingDisabled = !badgeclass.directAwardingDisabled}/>
+
+            <div class="separator">
+                <Switch value={badgeclass.evidenceRequired}
+                        disabled={badgeclass.directAwardingDisabled}
+                        label={I18n.t("newBadgeClassForm.form.directAward.details")}
+                        question={I18n.t("newBadgeClassForm.form.directAward.evidenceURL")}
+                        onChange={() => badgeclass.evidenceRequired = !badgeclass.evidenceRequired}/>
+                <Switch value={badgeclass.narrativeRequired}
+                        disabled={badgeclass.directAwardingDisabled}
+                        question={I18n.t("newBadgeClassForm.form.directAward.narrative")}
+                        onChange={() => badgeclass.narrativeRequired = !badgeclass.narrativeRequired}/>
             </div>
-        {/each}
-        <AddButton
-                text={I18n.t('models.badgeclass.addButtons.alignmentAddition')}
-                handleClick={() => addEmptyAlignment()}
-                visibility={showAddAlignmentButton}
-                disabled={false}
-        />
-    {/if}
 
-    <h4>{I18n.t('models.badgeclass.headers.additionalSections')}</h4>
+            <div class="line-separator"/>
 
-    <div class="add-buttons">
-        {#if badgeclass.isMicroCredentials && !showProgrammeIdentifier}
-            <AddButton
-                    text={I18n.t('models.badgeclass.addButtons.programmeIdentifier')}
-                    handleClick={addProgrammeIdentifier}
-                    visibility={!showProgrammeIdentifier}
-                    disabled={!mayEdit && !isCopy}
-            />
-        {:else}
-            <AddButton
-                    text={I18n.t('models.badgeclass.addButtons.educationalIdentifiers')}
-                    handleClick={() => {
-                        extensions[educationProgramIdentifier.name] = [""];
-                        showEducationalIdentifiers = true;}}
-                    visibility={!showEducationalIdentifiers}
-                    disabled={!mayEdit && !isCopy}
-            />
-        {/if}
-        {#if institution.grondslagFormeel !== null}
-            <AddButton
-                    text={I18n.t('models.badgeclass.addButtons.studyLoad')}
-                    handleClick={addStudyLoad}
-                    visibility={!showStudyLoad}
-                    disabled={!mayEdit && !isCopy}
-            />
-        {/if}
-        {#if !showTimeInvestment && institution.grondslagInformeel !== null}
-            <AddButton
-                    text={I18n.t('models.badgeclass.addButtons.timeInvestment')}
-                    handleClick={addTimeInvestment}
-                    visibility={!showTimeInvestment}
-                    disabled={!mayEdit && !isCopy}
-            />
-        {/if}
+            <Switch value={!badgeclass.selfEnrollmentDisabled}
+                    label={I18n.t("newBadgeClassForm.form.selfEnrollment.title")}
+                    question={I18n.t("newBadgeClassForm.form.selfEnrollment.selfEnrollmentAllowed")}
+                    onChange={() => badgeclass.selfEnrollmentDisabled = !badgeclass.selfEnrollmentDisabled}/>
 
-        <AddButton
-                text={I18n.t('models.badgeclass.addButtons.alignment')}
-                handleClick={() => addEmptyAlignment()}
-                visibility={!showAlignment}
-                disabled={false}
-        />
-    </div>
-</EntityForm>
+            <div class="separator">
+                <Switch value={badgeclass.evidenceStudentRequired}
+                        disabled={badgeclass.selfEnrollmentDisabled}
+                        label={I18n.t("newBadgeClassForm.form.selfEnrollment.details")}
+                        question={I18n.t("newBadgeClassForm.form.selfEnrollment.evidenceURL")}
+                        onChange={() => badgeclass.evidenceStudentRequired = !badgeclass.evidenceStudentRequired}/>
+                <Switch value={badgeclass.narrativeStudentRequired}
+                        disabled={badgeclass.selfEnrollmentDisabled}
+                        question={I18n.t("newBadgeClassForm.form.selfEnrollment.narrative")}
+                        onChange={() => badgeclass.narrativeStudentRequired = !badgeclass.narrativeStudentRequired}/>
+            </div>
+
+            <div class="line-separator"/>
+
+            <ExpirationSettings
+                    bind:expireValueSet={badgeclass.expireValueSet}
+                    disabled={false}
+                    className=""
+                    errors={errors.expirationSetting}
+                    bind:number={badgeclass.expirationDuration}
+                    bind:period={badgeclass.expirationPeriod}/>
+
+            <Field entity={entity}
+                   attribute="internal_tags"
+                   errors={errors.internal_tags}
+                   isSelect={true}
+                   tipKey="badgeclassInternalTags">
+                <Select
+                        bind:value={internalTags}
+                        items={(institution.tags || []).sort((t1,t2)=> t1.name.localeCompare(t2.name))}
+                        isMulti={true}
+                        customIndicator={indicator}
+                        showIndicator={false}
+                        showChevron={true}
+                        clearable={true}
+                        placeholder={I18n.t("placeholders.badgeClass.internalTags")}
+                        optionIdentifier="id"
+                />
+            </Field>
+
+            <Field entity={entity}
+                   attribute="isStackable"
+                   errors={errors.stackable}
+                   tipKey="badgeClassIsStackable"
+                   isSelect={true}
+                   required={true}>
+                <Select
+                        bind:value={badgeclass.stackable}
+                        items={stackableOptions}
+                        optionIdentifier="value"
+                        placeholder={I18n.t("newBadgeClassForm.form.placeHolder")}
+                        customIndicator={indicator}
+                        showIndicator={true}
+                        showChevron={true}
+                        clearable={false}/>
+            </Field>
+
+            {#if badgeclass.badgeClassType !== badgeClassTypes.EXTRA_CURRICULAR}
+                <Switch value={badgeclass.gradeAchievedRequired}
+                        label={I18n.t("models.badgeclass.isGradeAchieved")}
+                        question={I18n.t("models.badgeclass.gradeAchieved")}
+                        onChange={() => badgeclass.gradeAchievedRequired = !badgeclass.gradeAchievedRequired}/>
+            {/if}
+
+            {#if publicInstitutions.length > 0 && badgeclass.badgeClassType === badgeClassTypes.EXTRA_CURRICULAR}
+                <div></div>
+                <Field entity={entity}
+                       attribute="award_allowed_institutions"
+                       errors={errors.award_allowed_institutions}
+                       isSelect={true}
+                       tipKey="badgeclassAwardAllowedInstitutions">
+                    <Select
+                            bind:value={publicInstitutionsChosen}
+                            items={publicInstitutions}
+                            isMulti={true}
+                            customIndicator={indicator}
+                            showIndicator={false}
+                            showChevron={true}
+                            clearable={true}
+                            placeholder={I18n.t("placeholders.institution.allowedInstitutions")}
+                            optionIdentifier="id"
+                    />
+                </Field>
+            {/if}
+
+
+            <h4 class="one-row">{I18n.t('models.badgeclass.headers.alignment')}</h4>
+            {#each badgeclass.alignments as alignment, i}
+                {#if i > 0 && i !== badgeclass.alignments}
+                    <div class="line-separator"/>
+                {/if}
+                {#if mayRemoveAlignment(alignment) && (mayEdit || !alignment.existing)}
+                    <div class="one-row">
+                        <button class="rm-icon-container alignment"
+                                on:click={() => removeAlignment(i) }>{@html trash}</button>
+                    </div>
+                {/if}
+                {#if alignment.target_name === microCredentialsFramework.name}
+                    <div class="required-micro-credential-framework one-row">
+                        <p>{I18n.t("newBadgeClassForm.requiredMicroCredentialFramework")}</p>
+                        <a href="/toggle"
+                           on:click|preventDefault|stopPropagation={() => showMicroCredentialFramework = !showMicroCredentialFramework}>
+                            {I18n.t(`toggle.${!showMicroCredentialFramework ? "showMore" : "showLess"}`) }
+                        </a>
+                    </div>
+                {/if}
+                {#if alignment.target_name !== microCredentialsFramework.name || showMicroCredentialFramework}
+                    <Field entity={entity}
+                           attribute="alignmentName"
+                           errors={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_name: [] }
+                           tipKey="badgeClassRelatedFrameworkName">
+                        <TextInput
+                                bind:value={alignment.target_name}
+                                disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                error={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_name: null}
+                                placeholder={I18n.t("placeholders.badgeClass.alignmentName")}
+                        />
+                    </Field>
+                    <Field entity={entity}
+                           attribute="alignmentFramework"
+                           errors={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_framework: [] }
+                           tipKey="badgeClassRelatedFrameworkFramework">
+                        <TextInput
+                                bind:value={alignment.target_framework}
+                                disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                error={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_framework: null }
+                                placeholder={I18n.t("placeholders.badgeClass.alignmentFramework")}
+                        />
+                    </Field>
+                    <Field entity={entity}
+                           attribute="alignmentUrl"
+                           errors={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_url: []}
+                           tipKey="badgeClassRelatedFrameworkURL">
+                        <TextInput
+                                bind:value={alignment.target_url}
+                                disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                error={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_url: null}
+                                placeholder={alignment.target_name !== microCredentialsFramework.name ? I18n.t("placeholders.badgeClass.alignmentUrl") : ""}
+                        />
+                    </Field>
+                    <Field {entity} attribute="alignmentCode"
+                           errors={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_code: []}
+                           tipKey="badgeClassRelatedFrameworkCode">
+                        <TextInput
+                                bind:value={alignment.target_code}
+                                disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                error={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_code: null}
+                                placeholder={I18n.t("placeholders.badgeClass.alignmentCode")}
+                        />
+                    </Field>
+                    <div class="one-row">
+                        {#if mayRemoveAlignment(alignment)}
+                            <MarkDownExample onClick={() => badgeclass.alignments[i].target_description = markDownTemplate}
+                                             tipKey="badgeClassDescription"/>
+                        {/if}
+                        <Field entity={entity}
+                               attribute="alignmentDescription"
+                               errors={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_description: []}
+                               tipKey="badgeClassRelatedFrameworkDescription">
+                            <div class="mark-down-container"
+                                 class:disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                 class:error={errors.alignments && errors.alignments[i] ? errors.alignments[i].target_description: null}>
+                                <MarkdownField
+                                        bind:value={alignment.target_description}
+                                        disabled={!mayRemoveAlignment(alignment) && !isCopy}
+                                />
+                            </div>
+                        </Field>
+                    </div>
+                {/if}
+            {/each}
+            {#if showAddAlignmentButton}
+                <div class="one-row">
+                    <AddButton
+                            text={I18n.t('models.badgeclass.addButtons.alignmentAddition')}
+                            handleClick={() => addEmptyAlignment()}
+                            visibility={showAddAlignmentButton}
+                            disabled={!mayEdit && !isCopy}
+                    />
+                </div>
+            {/if}
+            {#if !isEmpty(errors)}
+                <div class="warnings one-row">
+                    <p>{I18n.t("newBadgeClassForm.errors")}</p>
+                </div>
+            {/if}
+        </div>
+
+    </EntityForm>
+{/if}
+{#if showPreview}
+    <PreviewBadgeClassModal badgeclass={previewBadgeCopy}
+                            publicInstitutions={publicInstitutions}
+                            close={() => {
+                             document.body.classList.remove("modal-open");
+                             showPreview = false;
+                            }
+                            }/>
+{/if}
+

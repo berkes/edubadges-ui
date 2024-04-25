@@ -20,7 +20,7 @@
     import PublicBreadcrumb from "./PublicBreadcrumb.svelte";
     import {translateBadgeClassProperties} from "../../util/utils";
     import Field from "../forms/Field.svelte";
-    import {isEmpty} from "lodash";
+    import {isEmpty} from "../../util/utils";
     import {isValidURL} from "../../util/validations";
     import EndorsementView from "../teachers/endorsements/EndorsementView.svelte";
     import {alignments, endorsements} from "../../api/queries";
@@ -102,7 +102,6 @@
       awardAllowedInstitutions,
       name,
       description,
-      criteriaUrl,
       awardNonValidatedNameAllowed,
       archived,
       criteriaText,
@@ -112,6 +111,16 @@
       evidenceStudentRequired,
       narrativeStudentRequired,
       selfEnrollmentDisabled,
+      typeBadgeClass,
+      participation,
+      assessmentType,
+      assessmentIdVerified,
+      assessmentSupervised,
+      qualityAssuranceName,
+      qualityAssuranceUrl,
+      qualityAssuranceDescription,
+      gradeAchievedRequired,
+      stackable,
       terms {
         entityId,
         termsType,
@@ -197,9 +206,10 @@
                 badgeClass.entityId = badgeClass.id.substring(badgeClass.id.lastIndexOf("/") + 1);
                 badgeClass.issuer.entityId = badgeClass.issuer.id.substring(badgeClass.issuer.id.lastIndexOf("/") + 1);
                 loaded = true;
-            }).catch(() => {
-                navigate("/404");
-            });
+            })
+                .catch(() => {
+                    navigate("/404");
+                });
         }
     });
 
@@ -300,47 +310,47 @@
 </script>
 
 <style lang="scss">
-  .overview-container {
-    padding: 40px 140px;
-  }
-
-  @media (max-width: 1120px) {
     .overview-container {
-      padding: 20px;
-    }
-  }
-
-  div.slots {
-    margin-right: 174px;
-
-    &.student {
-      margin-right: 315px;
+        padding: 40px 140px;
     }
 
-    @media (max-width: 1490px) {
-      margin-right: 0 !important;
+    @media (max-width: 1120px) {
+        .overview-container {
+            padding: 20px;
+        }
     }
-  }
 
-  div.enrol {
-    display: flex;
-    flex-direction: column;
+    div.slots {
+        margin-right: 174px;
 
-  }
+        &.student {
+            margin-right: 315px;
+        }
 
-  span.attention {
-    display: inline-block;
-    margin-top: 15px;
-    font-size: 15px;
-    line-height: 20px;
-    max-width: 275px;
-  }
-
-  div.evidence {
-    p.info {
-      margin-bottom: 20px;
+        @media (max-width: 1490px) {
+            margin-right: 0 !important;
+        }
     }
-  }
+
+    div.enrol {
+        display: flex;
+        flex-direction: column;
+
+    }
+
+    span.attention {
+        display: inline-block;
+        margin-top: 15px;
+        font-size: 15px;
+        line-height: 20px;
+        max-width: 275px;
+    }
+
+    div.evidence {
+        p.info {
+            margin-bottom: 20px;
+        }
+    }
 
 </style>
 

@@ -129,6 +129,11 @@ export function acceptTermsForBadge(terms_entity_id) {
     return validFetch(path, {body: JSON.stringify([{terms_entity_id, accepted: true}])}, "POST");
 }
 
+export function tagUsage(tagName) {
+    const path = `${serverUrl}/institution/tags`;
+    return validFetch(path, {body: JSON.stringify([{name, tagName}])}, "POST");
+}
+
 export function withdrawTermsForBadge(terms_agreement_entity_id) {
     const path = `${serverUrl}/user/terms/accept`;
     return validFetch(path, {body: JSON.stringify({terms_agreement_entity_id: terms_agreement_entity_id})}, "DELETE");
@@ -335,7 +340,7 @@ export function getPublicInstitution(entityId) {
 }
 
 export function getPublicBadgeClass(badgeId) {
-    const path = `${serverUrl}/public/badges/${badgeId}?expand=issuer&expand=awards&expand=endorsements`;
+    const path = `${serverUrl}/public/badges/${badgeId}?expand=issuer&expand=awards&expand=endorsements&expand=micro`;
     return validFetch(path, {}, "GET", false, false);
 }
 

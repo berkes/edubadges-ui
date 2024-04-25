@@ -154,6 +154,7 @@ I18n.translations.en = {
                 status: "Status",
                 show_all: "Show all",
                 show_less: "Show less",
+                badgeClassTag: "Tags"
             },
         },
         breadcrumb: {
@@ -339,7 +340,7 @@ I18n.translations.en = {
             create: "new",
             faculty: "Add new issuer group",
             issuer: "Add new issuer",
-            badgeclass: "Add new badge class",
+            badgeclass: "Add new badge class {{name}}",
             save: "Save",
             cancel: "Cancel",
         },
@@ -438,7 +439,7 @@ I18n.translations.en = {
         931: "There is already an unaccepted direct award for this EPPN",
         932: "This badge class requires a narrative for awarding",
         933: "This badge class requires evidence for awarding",
-        934: "The programme identifier is required when Credit points are specified.",
+        934: "The programme identifier is required when study points in ECTS are specified.",
         935: "Enter the time investment or remove this section.",
         936: "Cannot create edubadge collection with this name as it already exists.",
         937: "ECTS can not be empty or 0",
@@ -607,6 +608,7 @@ I18n.translations.en = {
             name_english: "Institution name in English",
             name_dutch: "Institution name in Dutch",
             award_allowed_institutions: "Award allowed institutions",
+            badge_class_tags: "Badge class tags",
             requestedBadges: "Requested edubadges"
         },
         faculty: {
@@ -665,9 +667,7 @@ I18n.translations.en = {
             name: "Name",
             description: "Description",
             about: "About this edubadge",
-            criteria_text: "What are the requirements to qualify for this edubadge?",
-            criteria_url: "Or provide a persistent link to a webpage with the criteria or more information",
-            criteria_url_value: "Link to the criteria for earning this edubadge:",
+            criteria_text: "Criteria & requirements to qualify",
             expiresAfter: "Expires after",
             expiresAfterOption: "After",
             expiresAfterNever: "Never",
@@ -691,7 +691,7 @@ I18n.translations.en = {
             studyLoad: "Study load",
             timeInvestment: "Time investment",
             ects: {
-                creditPoints: "Credit points (according to ECTS)",
+                creditPoints: "Study load in ECTS",
                 hours: "Hours"
             },
             sbu: "Studie Belasting Uren",
@@ -700,7 +700,17 @@ I18n.translations.en = {
             eqf: "Indicative EQF level",
             educationProgramIdentifier: "ISAT",
             educationProgramIdentifierLong: "Programme Identifiers",
-            notSet: "-",
+            participation: "Form of participation",
+            assessment: "Type of assessment",
+            url: "URL",
+            isStackable: "Stackable towards another credential?",
+            isGradeAchieved: "Grade achieved",
+            gradeAchieved: "Grade achieved required?",
+            notSet: "",
+            qualityAssuranceName: "Name",
+            qualityAssuranceUrl: "URL",
+            qualityAssuranceDescription: "Description",
+            internal_tags: "Internal tags",
             expirationPeriods: {
                 days: "Days",
                 weeks: "Weeks",
@@ -731,8 +741,10 @@ I18n.translations.en = {
                 educationProgramIdentifier:
                     "Consult <a target='_blank' rel='noreferrer' href='https://zakelijk.duo.nl/portaal/zoeken-en-vinden/resultaten'>the DUO CROHO register</a> or <a target='_blank' rel='noreferrer' href='https://kwalificaties.s-bb.nl/Lijsten/Groep/14'>the SBB CREBO lists</a> if you don’t know the code.",
                 eqf: "Check <a target='_blank' rel='noreferrer' href='https://www.nlqf.nl/daarom-nlqf/nlqf-niveaus'>https://www.nlqf.nl/daarom-nlqf/nlqf-niveaus</a> for help",
-                ects: "Whole and half points only. <br/>A minimum of 0.5 points is required.",
-                ectsMicroCredentials: "Whole and half points only. <br/>Valid value between 3 and 30 point."
+                ects: "Whole and half points only. Valid value between 0.5 and 240 points.",
+                ectsMicroCredentials: "Whole and half points only. Valid value between 3 and 30 points.",
+                studyLoad: "Whole hours only. Valid value between 84 and 840 hours.",
+                timeInvestment: "Whole hours only. Valid value between 84 and 840 hours.",
             },
             publicUrl: "Public URL",
             sorting: "Sorting:",
@@ -978,7 +990,7 @@ I18n.translations.en = {
     invites: {
         title: "Invite people to request",
         copyPublicUrl: "If you want to place the link to the registration page on your intranet or electronic learning environment, you can copy the link.",
-        copyPublicUrlDisabled: "This badge class is private and can not be awarded.",
+        copyPublicUrlDisabled: "This badge class is a draft and can not be awarded.",
         copyUrl: "Copy the link"
     },
     file: {
@@ -986,7 +998,7 @@ I18n.translations.en = {
         upload: "Upload image",
         remove: "Remove image",
         disclaimer:
-            "Image must be in .png format, contain at least 90x90 pixels, 300 dpi and have a maximum size of 256 KB.",
+            "<ul><li>Image must be in .png format</li><li>contain at least 90x90 pixels</li><li>have a maximum size of 256 KB</li></ul>",
     },
     copyToClipboard: {
         copied: "Copied to clipboard"
@@ -1183,7 +1195,6 @@ I18n.translations.en = {
             description: "(Required field) e.g. Political infuence of the Church during the Renaissance",
             learningOutcome: "e.g. is able to read and interpret ancient sources as well as modern texts, and demonstrates a good overview of the important developments of this time period.",
             criteriaText: "(Either criteria or criteria URL is required) e.g. online multiple choice exam",
-            criteriaUrl: "e.g. https://www.universityofharderwijk.nl/renaissance/criteria",
             studyLoad: "e.g. 120",
             timeInvestment: "e.g. 260",
             status: {
@@ -1197,7 +1208,10 @@ I18n.translations.en = {
             alignmentFramework: "e.g. ESCO",
             alignmentDescription: "e.g. The discipline that studies, analyses and presents the events of the past related to humans.",
             alignmentUrl: "e.g. http://data.europa.eu/esco/skill/2b22f3b1-5de4-43f9-b6d1-b20f65871268",
-            alignmentCode: "e.g. 2b22f3b1-5de4-43f9-b6d1-b20f65871268"
+            alignmentCode: "e.g. 2b22f3b1-5de4-43f9-b6d1-b20f65871268",
+            qualityAssuranceName: "e.g. something",
+            qualityAssuranceUrl: "e.g. https://data.europa.com/qa",
+            internalTags: "Select tags..."
         },
         permissions: {
             notes: "e.g. why did you add permissions?"
@@ -1242,8 +1256,8 @@ I18n.translations.en = {
         //badgeClassImage: "badgeClassImage",
         badgeClassExpireSettings: "After this period edubadges will expiry and will be no longer valid.",
         badgeClassName: "Avoid abbreviations, make sure the name is recognisable for others.",
-        badgeClassDescription: "This description supports markdown. " +
-            "See <a target=\"_blank\" href=\"https://wiki.surfnet.nl/display/Edubadges/Edubadges+Example+BadgeClass\"> the wiki </a> for examples.",
+        // badgeClassDescription: "This description supports markdown. " +
+        //     "See <a target=\"_blank\" href=\"https://wiki.surfnet.nl/display/Edubadges/Edubadges+Example+BadgeClass\"> the wiki </a> for examples.",
         badgeClassLanguageOfInstruction: "The language used in obtaining this edubadge.",
         badgeClassLearningOutcome: "Describe the learning outcomes or learning goals. Recorded in the Teaching and Examination Regulations.",
         //badgeClassLearningIssuer: "badgeClassLearningIssuer",
@@ -1258,7 +1272,6 @@ I18n.translations.en = {
         badgeClassDirectAwardingDisabled: "If checked, then this badge class can not be direct awarded",
         badgeClassSelfEnrollmentDisabled: "If checked, then this badge class can not be requested by students",
         //badgeClassCriteriaRequirements: "badgeClassCriteriaRequirements",
-        //badgeClassCriteriaUrl: "badgeClassCriteriaUrl",
         //badgeClassTypeOfStudyLoad: "badgeClassTypeOfStudyLoad",
         badgeClassStudyLoadNumber: "Study Tax Hours (SBU in Hours)",
         badgeClassTimeInvestmentNumber: "How many hours have to be invested to acquire this non-formal edubadge.",
@@ -1273,7 +1286,7 @@ I18n.translations.en = {
         //badgeClassRelatedFrameworkDescription: "badgeClassRelatedFrameworkDescription",
         facultyName: "Avoid abbreviations, make sure your name is recognisable, also to external parties.",
         facultyOnBehalfOf: "When checked, the badge class indicates that edubadges are issued on behalf of this issuer group. Can be used when issuing on behalf of a consortium.",
-        facultyOnBehalfOfUrl: "When Issue on behalf of name issuer group is checked, this URL will be used as a external link to the issuer group.",
+        facultyOnBehalfOfUrl: "Use the URL as a external link to the issuer group.",
         facultyOnBehalfOfDisplayName: "When Issue on behalf of name issuer group is checked, this display name will used instead of the actual name of the issuer group.",
         //facultyDescriptionEn: "facultyDescriptionEn",
         //facultyDescriptionNl: "facultyDescriptionNl",
@@ -1292,6 +1305,7 @@ I18n.translations.en = {
         institutionGradingTable: "Use a URL that will not change. (Persistent URL).",
         institutionLinkedinOrgIdentifier: "LinkedIn identifier for this institution / organisation",
         institutionAwardAllowedInstitutions: "Select other institutions from which<br/>students potentially may be awarded edubadges.",
+        institutionBadgeClassTags: "Select or add tags. The tags can be linked to badge classes",
         badgeclassAwardAllowedInstitutions: "Select other institutions from which<br/>students may be awarded this edubadge.",
         enrollmentEvidenceNarrative: "A personal narrative that can be added to this awarded edubadge.",
         enrollmentEvidenceURL: "The URI of a webpage presenting the evidence of this achievement.",
@@ -1308,7 +1322,8 @@ I18n.translations.en = {
         endorsementDescription: "The description of the endorsement",
         endorsementClaim: "The claim describes why and how this badge class is similar to the endorsed badge",
         endorsementBadgeClass: "The badge class you would like to endorse.",
-        awardScheduling: "Enter a scheduling date to set the date / time when the emails will be send out to the users who are awarded the badge"
+        awardScheduling: "Enter a scheduling date to set the date / time when the emails will be send out to the users who are awarded the badge",
+        badgeClassIsStackable: "A stackable badge-class can be linked to another badge-class"
     },
     badgeOverview: {
         faculty: "Issuer Group",
@@ -1336,10 +1351,12 @@ I18n.translations.en = {
             eqf: "EQF level {{level}}",
         },
         badgeClassType: {
-            OTHER: "Other",
             ARCHIVED: "Archived",
             ALL: "All",
-            MICRO_CREDENTIALS: "Pilot Microcredentials"
+            MICRO_CREDENTIALS: "Pilot Microcredentials",
+            DRAFT: "Draft",
+            REGULAR: "Regular",
+            EXTRA_CURRICULAR: "Extra-curricular",
         },
         issuer: {
             contact: "Contact the issuer",
@@ -1720,9 +1737,9 @@ I18n.translations.en = {
         title: "Management queries",
         institutionAdmins: "Institution admins",
         institutionBadges: "Badge overview",
-        institutionMicroCredentials: "Micro-credentials count",
-        countMicroCredentials: "Micro-credentials assertions per user",
-        microCredentialsBadges: "Micro-credentials badges",
+        institutionMicroCredentials: "Microcredentials count",
+        countMicroCredentials: "Microcredentials assertions per user",
+        microCredentialsBadges: "Microcredentials badges",
         institutionBadgeOverview: "Awarded badges overview",
         issuerMembers: "Issuer members",
         clear: "Clear",
@@ -1733,4 +1750,102 @@ I18n.translations.en = {
         select: "Select the query to run...",
         loaded: "{{name}} query loaded in {{time}}ms and ready to copy, download or show....."
     },
+    newBadgeClassForm: {
+        badgeClassType: "Type",
+        modal: {
+            choose: "Choose a badge class type",
+            tipPre: "Tip: You can also duplicate an ",
+            tipAction: "existing badge class",
+            tip: "Clik on an existing badge class and choose the option to copy the badge class in the right header section. Go to the ",
+            issuerLink: "overview of all badge classes for issuer {{name}}",
+            shortCopy: "Short copy that makes sense to choose this one.",
+            create: "Create",
+            types: {
+                micro_credential: "Microcredential",
+                regular: "Regular",
+                extra_curricular: "Extra curricular"
+            },
+            info: {
+                micro_credential: "A badge class with all metadata following EU guidelines.",
+                regular: "A badge class based on ECTS.",
+                extra_curricular: "A badge class based on time investment."
+            },
+            notAvailableTypeInfo: {
+                micro_credential: "Your institution {{name}} is not configured to award mirco-credential badges.",
+                regular: "Your institution {{name}} is missing the formal 'grondslag' and therefore can't issue regular badges.",
+                extra_curricular: "Your institution {{name}} is missing the informal 'grondslag' and therefore can't issue extra curricular badges.",
+            }
+        },
+        form: {
+            placeHolder: "Please select...",
+            markupExample: "Insert an example in MarkDown",
+            programmeInformation: "Program information",
+            assessmentInformation: "Assessment information",
+            qualityAssurance: "Quality assurance",
+            awardSettings: "Award settings",
+            relatedEducationalFramework: "Related Educational Frameworks",
+            switchToStudyLoad: "Switch to using study load (hours) instead of ECTS",
+            switchToECTS: "Switch to using Credit Points (ECTS) instead of hours",
+            participation: {
+                name: "Form of participation",
+                options: {
+                    organized: "Organized learning activities",
+                    personalized: "Personalized learning activities",
+                    practical: "Work or practical experience",
+                    voluntary_work: "Voluntary work"
+                }
+            },
+            assessment: {
+                name: "Type of assessment",
+                options: {
+                    knowledge_test: "Knowledge test",
+                    behavioural_assessment: "Behavioural assessment",
+                    professional_product: "Professional product",
+                    application_skill: "Application of a skill",
+                    portfolio_assessment: "Portfolio assessment",
+                    recognition_acquired_competences: "Recognition acquired competences",
+                    personalized_assessment: "Personalized assessment"
+                },
+                supervision: "Supervision & ID verification",
+                supervised: "Was the assessment supervised?",
+                idVerification: "Was the student's identity verified?",
+                supervisionOptions: {
+                    o1: "Supervised with identity verification",
+                    o2: "Supervised without identity verification",
+                    o3: "Not supervised without identity verification",
+                    o4: "Not supervised with identity verification"
+                }
+            },
+            directAward: {
+                title: "Direct awards",
+                directAwardAllowed: "Direct awarding allowed?",
+                details: "Direct award details",
+                evidenceURL: "Evidence (URL) required when issuing?",
+                narrative: "Narrative required when issuing?"
+            },
+            selfEnrollment: {
+                title: "Self enrollment",
+                selfEnrollmentAllowed: "Self enrollment allowed?",
+                details: "Self enrollment details",
+                evidenceURL: "Evidence (URL) required for enrollment?",
+                narrative: "Narrative required for enrollment?"
+            },
+            stackable: {
+                notStackable: "No, stand alone microcredential",
+                stackable: "Yes, stackable microcredential",
+            }
+        },
+        saveAsDraft: "Save as draft",
+        draft: "Draft",
+        preview: "Preview badge class",
+        publish: "Publish",
+        tagsPlaceholder: "Start typing here and press <enter> to add a new badge class tag",
+        requiredMicroCredentialFramework: "Required: Quality framework Microcredentials for Professionals HBO and WO",
+        link: " - (link)",
+        programme: "The programme",
+        assessment: "The assessment",
+        badge: "The badge class",
+        errors: "There are required attributes missing or invalid. Please review the input errors."
+    }
+
 };

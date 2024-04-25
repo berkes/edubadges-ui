@@ -2,13 +2,9 @@
     import {onMount} from "svelte";
     import {BadgeclassForm} from "../teachers";
     import {queryData} from "../../api/graphql";
-    import {
-        deduceExpirationPeriod,
-        expirationPeriods
-    } from "../extensions/badges/expiration_period";
+    import {deduceExpirationPeriod} from "../extensions/badges/expiration_period";
     import Spinner from "../Spinner.svelte";
-    import {translateProperties} from "../../util/utils";
-    import {value} from "../forms/File.svelte";
+    import {isEmpty, translateProperties} from "../../util/utils";
     import {alignments} from "../../api/queries";
 
     export let entityId;
@@ -32,7 +28,10 @@
       awardAllowAllInstitutions,
       alternativeIdentifier,
       directAwardingEnabled,
-      defaultLanguage
+      defaultLanguage,
+      tags {
+        id, name
+      }
     },
     issuers {
       nameEnglish,
@@ -45,7 +44,6 @@
       image,
       description,
       createdAt,
-      criteriaUrl,
       awardNonValidatedNameAllowed,
       archived,
       criteriaText,
@@ -56,9 +54,22 @@
       evidenceStudentRequired,
       narrativeStudentRequired,
       awardAllowedInstitutions,
+      tags {
+        id, name
+      },
       isMicroCredentials,
       directAwardingDisabled,
       selfEnrollmentDisabled,
+      typeBadgeClass,
+      participation,
+      assessmentType,
+      assessmentIdVerified,
+      assessmentSupervised,
+      qualityAssuranceName,
+      qualityAssuranceUrl,
+      qualityAssuranceDescription,
+      gradeAchievedRequired,
+      stackable,
       ${alignments},
       issuer {
         nameEnglish,
@@ -103,6 +114,7 @@
     onMount(() => {
         queryData(query, {entityId}).then(res => {
             badgeclass = res.badgeClass;
+            badgeclass.badgeClassType = badgeclass.typeBadgeClass.toLowerCase();
             issuers = res.issuers || [];
             translateProperties(badgeclass.issuer);
             translateProperties(badgeclass.issuer.faculty);
@@ -111,17 +123,21 @@
                 badgeclass.entityId = null;
                 badgeclass.name = "";
                 badgeclass.id = null;
-                //https://stackoverflow.com/questions/25690641/img-url-to-dataurl-using-javascript
-                fetch(badgeclass.image).then(res => {
-                    res.blob().then(content => {
-                        const reader = new FileReader();
-                        reader.onload = ({ target: { result } }) => {
-                          badgeclass.image  = result;
-                          loaded = true;
-                        };
-                        reader.readAsDataURL(content);
-                    })
-                });
+                if (isEmpty(badgeclass.image)) {
+                    loaded = true;
+                } else {
+                    //https://stackoverflow.com/questions/25690641/img-url-to-dataurl-using-javascript
+                    fetch(badgeclass.image).then(res => {
+                        res.blob().then(content => {
+                            const reader = new FileReader();
+                            reader.onload = ({target: {result}}) => {
+                                badgeclass.image = result;
+                                loaded = true;
+                            };
+                            reader.readAsDataURL(content);
+                        })
+                    });
+                }
             }
             issuers.forEach(issuer => translateProperties(issuer));
 
