@@ -82,6 +82,10 @@ module.exports = {
   },
   mode: "production",
   plugins: [
+    new BundleAnalyzerPlugin({
+      // use value from environment var STATS or 'disabled'
+      analyzerMode: process.env.STATS || "disabled",
+    }),
     new MiniCssExtractPlugin({
       filename: "[name].[hash].css",
     }),

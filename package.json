@@ -36,7 +36,7 @@
     "svg-inline-loader": "^0.8.0",
     "uglifyjs-webpack-plugin": "^2.2.0",
     "webpack": "^4.41.2",
-    "webpack-bundle-analyzer": "^4.10.0",
+    "webpack-bundle-analyzer": "^4.10.2",
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.15.2"
   },
@@ -46,7 +46,7 @@
     "dev": "NODE_OPTIONS=--openssl-legacy-provider webpack-dev-server --open",
     "test": "jest src",
     "test:watch": "npm run test -- --watch",
-    "stats": "webpack-bundle-analyzer public/stats.json"
+    "stats": "STATS=server NODE_OPTIONS=--openssl-legacy-provider NODE_ENV=production cross-env webpack --mode=production"
   },
   "dependencies": {
     "@bytemd/plugin-gfm": "^1.10.13",
