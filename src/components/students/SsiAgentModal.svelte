@@ -32,6 +32,7 @@
 
     if (offerURIParams.get("credential_offer_uri") !== null) {
       wwwalletLink.searchParams.set('credential_offer_uri', offerURIParams.get("credential_offer_uri"));
+      wwwalletLink.searchParams.set('wwwallet_camera_was_used', true);
       linkClass = '';
     } else {
       linkClass = 'disabled';
